@@ -1,0 +1,36 @@
+
+enum TokenType {
+    start_of_line,
+    comment,
+    string,
+    escape,
+    macro_escape,
+    interp,
+    space,
+    operator,
+    keyword,
+    region,
+    function,
+    opcode,
+    register,
+    condition,
+    macro_call,
+    label,
+    identifier,
+    fixed_point_number,
+    decimal_number,
+    hex_number,
+    binary_number,
+    octal_number,
+    gbgfx_number,
+    comma,
+    colon,
+    open_bracket,
+    close_bracket,
+    open_paren,
+    close_paren,
+    unknown,
+    end_of_line
+}
+
+export default TokenType

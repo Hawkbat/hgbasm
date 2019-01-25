@@ -1,0 +1,4 @@
+Look into performance issues; most notably, macro use incurs a huge memory and speed penalty, and linking is extremely slow with larger projects
+
+Start work on bridge with Monaco/VSCode
+

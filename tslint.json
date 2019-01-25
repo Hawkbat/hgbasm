@@ -1,0 +1,46 @@
+{
+	"extends": "tslint:latest",
+	"rules": {
+		"quotemark": {
+			"options": "single"
+		},
+		"semicolon": {
+			"options": "never"
+		},
+		"trailing-comma": {
+			"options": {
+				"singleline": "never",
+				"multiline": "never",
+				"esSpecCompliant": false
+			}
+		},
+		"prefer-template": {
+			"severity": "warn"
+		},
+		"no-implicit-dependencies": {
+			"options": "dev"
+		},
+		"array-type": {
+			"options": "array"
+		},
+		"typedef": {
+			"options": [
+				"call-signature",
+				"property-declaration",
+				"parameter"
+			]
+		},
+		"object-literal-sort-keys": {
+			"severity": "off"
+		},
+		"max-line-length": {
+			"severity": "off"
+		},
+		"no-bitwise": {
+			"severity": "off"
+		},
+		"no-submodule-imports": {
+			"severity": "off"
+		}
+	}
+}

@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"rootDir": "./src/",
+		"outDir": "./out/",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"target": "es2018",
+		"lib": [
+			"es2018"
+		],
+		"strict": true,
+		"forceConsistentCasingInFileNames": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"sourceMap": true,
+		"plugins": [
+			{
+				"name": "typescript-tslint-plugin",
+				"ignoreDefinitionFiles": true,
+				"configFile": "./tslint.json"
+			}
+		]
+	}
+}
