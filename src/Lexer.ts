@@ -12,6 +12,16 @@ interface ILexerRule {
     allowIn?: TokenType
 }
 
+const regexpCache: { [key: string]: RegExp } = {}
+
+function getCachedRegExp(key: string, flags: string = 'g'): RegExp {
+    if (!regexpCache[key]) {
+        regexpCache[key] = new RegExp(key, flags)
+    }
+    regexpCache[key].lastIndex = 0
+    return regexpCache[key]
+}
+
 export default class Lexer {
 
     public rules: ILexerRule[] = [
@@ -137,50 +147,10 @@ export default class Lexer {
 
     public lex(line: LineContext, options: ILexerOptions): LexerContext {
         const ctx = new LexerContext(options, line)
-        const lineNumber = line.getLineNumber()
-        const tokens: Token[] = []
 
         let text = line.source.text
 
-        if (ctx.line.eval && ctx.line.eval.beforeState) {
-            let anyReplaced = true
-            while (anyReplaced) {
-                anyReplaced = false
-                if (ctx.line.eval.beforeState.stringEquates && !/\bpurge\b/i.test(text) && !/\bdef\b/i.test(text)) {
-                    for (const key of Object.keys(ctx.line.eval.beforeState.stringEquates)) {
-                        const value = ctx.line.eval.beforeState.stringEquates[key]
-                        const regex = new RegExp(`(?<!\\.)\\{?\\b${key}\\b\\}?`, 'g')
-                        const newText = this.applyTextReplace(text, regex, value)
-                        if (text !== newText) {
-                            text = newText
-                            anyReplaced = true
-                        }
-                    }
-                }
-                if (ctx.line.eval.beforeState.inMacroCalls && ctx.line.eval.beforeState.inMacroCalls.length) {
-                    const macroCall = ctx.line.eval.beforeState.inMacroCalls[0]
-                    for (let key = 1; key < 10; key++) {
-                        const offset = key - 1 + macroCall.argOffset
-                        const value = macroCall.args[offset] ? macroCall.args[offset] : ''
-                        const regex = new RegExp(`\\\\${key}`, 'g')
-                        const newText = this.applyTextReplace(text, regex, value)
-                        if (text !== newText) {
-                            text = newText
-                            anyReplaced = true
-                        }
-                    }
-                }
-                if (typeof ctx.line.eval.beforeState.macroCounter !== 'undefined') {
-                    const value = `_${ctx.line.eval.beforeState.macroCounter}`
-                    const regex = new RegExp(`\\\\@`, 'g')
-                    const newText = this.applyTextReplace(text, regex, value)
-                    if (text !== newText) {
-                        text = newText
-                        anyReplaced = true
-                    }
-                }
-            }
-        }
+        text = this.applyAllReplacements(text, ctx)
 
         line.text = text
 
@@ -189,6 +159,68 @@ export default class Lexer {
             this.compiler.logger.log('stringExpansion', 'After: ', line.text)
         }
 
+        const tokens = this.lexString(text, line.getLineNumber())
+
+        ctx.tokens = tokens.map((token) => token.clone())
+
+        line.lex = ctx
+
+        return ctx
+    }
+
+    public applyAllReplacements(text: string, ctx: LexerContext): string {
+        if (ctx.line.eval && ctx.line.eval.state) {
+            let anyReplaced = true
+            while (anyReplaced) {
+                anyReplaced = false
+                if (ctx.line.eval.state.stringEquates && !getCachedRegExp('\\bpurge\\b', 'i').test(text) && !getCachedRegExp('\\bdef\\b', 'i').test(text)) {
+                    for (const key of Object.keys(ctx.line.eval.state.stringEquates)) {
+                        if (text.indexOf(key) === -1) {
+                            continue
+                        }
+                        const value = ctx.line.eval.state.stringEquates[key]
+                        const regex = getCachedRegExp(`(?<!\\.)\\{?\\b${key}\\b\\}?`)
+                        const newText = this.applyTextReplace(text, regex, value)
+                        if (text !== newText) {
+                            text = newText
+                            anyReplaced = true
+                        }
+                    }
+                }
+                if (ctx.line.eval.state.inMacroCalls && ctx.line.eval.state.inMacroCalls.length) {
+                    const macroCall = ctx.line.eval.state.inMacroCalls[0]
+                    for (let key = 1; key < 10; key++) {
+                        if (text.indexOf(`\\${key}`) === -1) {
+                            continue
+                        }
+                        const offset = key - 1 + macroCall.argOffset
+                        const value = macroCall.args[offset] ? macroCall.args[offset] : ''
+                        const regex = getCachedRegExp(`\\\\${key}`)
+                        const newText = this.applyTextReplace(text, regex, value)
+                        if (text !== newText) {
+                            text = newText
+                            anyReplaced = true
+                        }
+                    }
+                }
+                if (ctx.line.eval.state.macroCounter !== undefined) {
+                    if (text.indexOf('\\@') >= 0) {
+                        const value = `_${ctx.line.eval.state.macroCounter}`
+                        const regex = getCachedRegExp(`\\\\@`)
+                        const newText = this.applyTextReplace(text, regex, value)
+                        if (text !== newText) {
+                            text = newText
+                            anyReplaced = true
+                        }
+                    }
+                }
+            }
+        }
+        return text
+    }
+
+    public lexString(text: string, lineNumber: number): Token[] {
+        const tokens: Token[] = []
         tokens.push(new Token(TokenType.start_of_line, '', lineNumber, 0))
 
         for (const rule of this.rules) {
@@ -197,23 +229,26 @@ export default class Lexer {
             while (matches !== null) {
                 const t = new Token(rule.type, matches[1], lineNumber, matches.index)
 
-                const overlaps = tokens.filter((o) => o.col <= t.col && o.value.length + o.col >= t.value.length + t.col)
-                if (overlaps.length === 0) {
-                    tokens.push(t)
-                } else if (rule.allowIn) {
-                    for (const o of overlaps) {
-                        if (o.type === rule.allowIn) {
-                            tokens.push(t)
-                            break
+                const inString = ((text.substr(0, t.col).match(/(?<!(?<!\\)\\)"/g) || []).length % 2) !== 0
+
+                if (!inString || t.type === TokenType.string || rule.allowIn === TokenType.string) {
+                    const overlaps = tokens.filter((o) => o.col <= t.col && o.value.length + o.col >= t.value.length + t.col)
+                    if (overlaps.length === 0) {
+                        tokens.push(t)
+                    } else if (rule.allowIn) {
+                        for (const o of overlaps) {
+                            if (o.type === rule.allowIn) {
+                                tokens.push(t)
+                                break
+                            }
                         }
                     }
                 }
-
                 matches = rule.match.exec(text)
             }
         }
 
-        tokens.push(new Token(TokenType.end_of_line, '\n', lineNumber, line.text.length))
+        tokens.push(new Token(TokenType.end_of_line, '\n', lineNumber, text.length))
 
         tokens.sort((a, b) => {
             if (a.line !== b.line) { return a.line - b.line }
@@ -221,11 +256,7 @@ export default class Lexer {
             return a.type - b.type
         })
 
-        ctx.tokens = tokens.map((token) => token.clone())
-
-        line.lex = ctx
-
-        return ctx
+        return tokens
     }
 
     public applyTextReplace(text: string, regex: RegExp, value: string): string {

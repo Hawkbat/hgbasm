@@ -1,4 +1,4 @@
 
 export default interface IConditional {
-    readonly condition: boolean
+    condition: boolean
 }

@@ -219,9 +219,9 @@ export default class Parser {
         const ctx = new ParserContext(options, line)
 
         if (line.lex) {
-            if (line.eval && line.eval.beforeState) {
-                const checkMacro = line.eval.beforeState.inMacro && !line.lex.tokens.some((t) => t.type === TokenType.keyword && t.value.toLowerCase() === 'endm')
-                const checkConditional = line.eval.beforeState.inConditionals && line.eval.beforeState.inConditionals.length && !line.eval.beforeState.inConditionals.every((cond) => cond.condition) && !(line.lex.tokens && line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
+            if (line.eval && line.eval.state) {
+                const checkMacro = line.eval.state.inMacro && !line.lex.tokens.some((t) => t.type === TokenType.keyword && t.value.toLowerCase() === 'endm')
+                const checkConditional = line.eval.state.inConditionals && line.eval.state.inConditionals.length && !line.eval.state.inConditionals.every((cond) => cond.condition) && !(line.lex.tokens && line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
                 if (checkMacro || checkConditional) {
                     ctx.node = new Node(NodeType.comment, new Token(TokenType.comment, line.text, 0, 0), [])
                     line.parse = ctx

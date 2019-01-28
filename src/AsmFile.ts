@@ -5,9 +5,9 @@ export default class AsmFile {
     public readonly buffer: ArrayBuffer
     public readonly lines: ReadonlyArray<AsmLine>
 
-    constructor(path: string, content: Buffer | string) {
+    constructor(path: string, content: Uint8Array | string) {
         this.path = path
-        if (content instanceof Buffer) {
+        if (content instanceof Uint8Array) {
             this.buffer = content
             this.lines = [...content].map((a) => String.fromCharCode(a)).join('').split(/\r?\n/).map((line) => new AsmLine(this, line))
         } else {

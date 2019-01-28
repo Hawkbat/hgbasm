@@ -1,9 +1,9 @@
 
 export default interface ILabel {
-    readonly id: string
-    readonly file: string
-    readonly line: number
-    readonly section: string
-    readonly byteOffset: number
-    readonly exported: boolean
+    id: string
+    file: string
+    line: number
+    section: string
+    byteOffset: number
+    exported: boolean
 }

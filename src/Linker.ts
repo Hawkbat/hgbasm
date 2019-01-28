@@ -3,9 +3,13 @@ import CompilerContext from './CompilerContext'
 import Diagnostic from './Diagnostic'
 import EvaluatorContext from './EvaluatorContext'
 import ILabel from './ILabel'
+import ILineState from './ILineState'
 import ILinkerOptions from './ILinkerOptions'
+import ILinkHole from './ILinkHole'
 import ISection from './ISection'
 import LinkerContext from './LinkerContext'
+import Token from './Token'
+import TokenType from './TokenType'
 
 interface IRegionType {
     start: number
@@ -31,7 +35,99 @@ export default class Linker {
     public link(context: CompilerContext, options: ILinkerOptions): LinkerContext {
         const ctx = new LinkerContext(options, context)
 
-        const regionTypes: { [key: string]: IRegionType | undefined } = {
+        const regionTypes = this.getRegionTypes(ctx)
+        const labels = this.getAllLabels(ctx)
+        const sections = this.getAllSections(regionTypes, ctx)
+
+        const linkSections: ILinkSection[] = []
+        const linkSectionMap: { [key: string]: ILinkSection | undefined } = {}
+        let totalBanks = 1
+
+        if (options.linkerScript) {
+            const lines = options.linkerScript.split(/\r?\n/g)
+            let lineNumber = 0
+
+            const addrs: { [key: string]: number } = {}
+            let region = ''
+            let bank = 0
+            let addrKey = ''
+
+            for (const line of lines) {
+                const tokens = this.compiler.lexer.lexString(line, lineNumber++).filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp && t.type !== TokenType.comment && t.type !== TokenType.start_of_line && t.type !== TokenType.end_of_line).reverse()
+                while (tokens.length) {
+                    const token = tokens.pop()!
+                    if (token.type === TokenType.region) {
+                        region = token.value.toLowerCase()
+                        bank = this.parseNumberToken(tokens.pop())
+                        addrKey = `${region}[${bank}]`
+                        addrs[addrKey] = addrs[addrKey] ? addrs[addrKey] : regionTypes[region]!.start
+                    } else if (token.type === TokenType.string) {
+                        const section = sections.find((s) => s.id === token.value.substr(1, token.value.length - 2))
+                        if (section) {
+                            section.fixedAddress = addrs[addrKey]
+                            section.region = region
+                            section.bank = bank
+                            addrs[addrKey] += section.bytes.length
+                        }
+                    } else if (token.value.toLowerCase() === 'org') {
+                        addrs[addrKey] = this.parseNumberToken(tokens.pop())
+                    } else if (token.value.toLowerCase() === 'align') {
+                        const alignment = 1 << this.parseNumberToken(tokens.pop())
+                        if (alignment > 0 && (addrs[addrKey] % alignment) !== 0) {
+                            addrs[addrKey] += alignment - (addrs[addrKey] % alignment)
+                        }
+                    } else if (token.value.toLowerCase() === 'include') {
+                        throw new Error('Include not yet implemented in linker scripts')
+                    }
+                }
+            }
+        }
+
+        for (const section of sections) {
+            const link = this.allocate(linkSections, regionTypes, section, ctx)
+            if (link) {
+                linkSections.push(link)
+                linkSectionMap[section.id] = link
+                this.compiler.logger.log('linkSection', `${link.region}[${link.bank}] ${this.hexString(link.start)} - ${this.hexString(link.end)} = ${link.section.id}`)
+
+                if (link.region === 'rom0' || link.region === 'romx') {
+                    totalBanks = Math.max(totalBanks, link.bank + 1)
+                }
+            }
+        }
+
+        if (options.generateSymbolFile) {
+            ctx.symbolData = this.getSymbolData(labels, linkSectionMap)
+        }
+
+        const data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
+        data.fill(ctx.options.padding)
+
+        for (const link of linkSections) {
+            this.fillLinkSection(link, data)
+        }
+
+        for (const hole of context.holes) {
+            this.fillHole(hole, labels, linkSectionMap, data)
+        }
+
+        ctx.romData = data
+
+        return ctx
+    }
+
+    public parseNumberToken(t: Token | undefined): number {
+        if (t && t.type === TokenType.decimal_number) {
+            return parseInt(t.value, 10)
+        } else if (t && t.type === TokenType.hex_number) {
+            return parseInt(t.value.substr(1), 16)
+        } else {
+            return 0
+        }
+    }
+
+    public getRegionTypes(ctx: LinkerContext): { [key: string]: IRegionType | undefined } {
+        return {
             rom0: ctx.options.disableRomBanks ?
                 {
                     start: 0x0000,
@@ -97,58 +193,38 @@ export default class Linker {
                 banks: 1
             }
         }
+    }
 
-        let sections = context.files.reduce((arr: ISection[], file) => {
+    public getAllLabels(ctx: LinkerContext): ILabel[] {
+        return ctx.context.files.reduce((arr: ILabel[], file) => {
             const line = file.lines[file.endLine]
-            if (line.eval && line.eval.afterState && line.eval.afterState.sections) {
-                arr = arr.concat(Object.values(line.eval.afterState.sections))
+            if (line.eval && line.eval.state && line.eval.state.labels) {
+                arr = arr.concat(Object.values(line.eval.state.labels))
             }
             return arr
         }, [])
+    }
 
-        sections = sections.sort((a, b) => {
-            if (a.region !== b.region) {
-                return a.region.localeCompare(b.region)
+    public getAllSections(regionTypes: { [key: string]: IRegionType | undefined }, ctx: LinkerContext): ISection[] {
+        let sections = ctx.context.files.reduce((arr: ISection[], file) => {
+            const line = file.lines[file.endLine]
+            if (line.eval && line.eval.state && line.eval.state.sections) {
+                arr = arr.concat(Object.values(line.eval.state.sections))
             }
-            const aHasAddr = typeof a.fixedAddress !== 'undefined'
-            const bHasAddr = typeof b.fixedAddress !== 'undefined'
-            if (aHasAddr && !bHasAddr) {
-                return -1
-            } else if (!aHasAddr && bHasAddr) {
-                return 1
-            } else if (aHasAddr && bHasAddr) {
-                return a.fixedAddress! - b.fixedAddress!
-            }
-            const aHasBank = typeof a.bank !== 'undefined'
-            const bHasBank = typeof b.bank !== 'undefined'
-            if (aHasBank && !bHasBank) {
-                return -1
-            } else if (!aHasBank && bHasBank) {
-                return 1
-            } else if (aHasBank && bHasBank) {
-                return a.bank! - b.bank!
-            }
-            const aHasAlign = typeof a.alignment !== 'undefined'
-            const bHasAlign = typeof b.alignment !== 'undefined'
-            if (aHasAlign && !bHasAlign) {
-                return -1
-            } else if (!aHasAlign && bHasAlign) {
-                return 1
-            }
-            return a.bytes.length - b.bytes.length
-        })
+            return arr
+        }, [])
 
         sections = sections.filter((section) => {
             const type = regionTypes[section.region]
             if (!type) {
                 this.error('Invalid memory region', section, ctx)
-            } else if (section.bank && !type.banks) {
+            } else if (section.bank && type.banks === 1) {
                 this.error('Memory region does not support banking', section, ctx)
-            } else if (section.bank && type.banks && section.bank >= type.banks) {
+            } else if (section.bank && section.bank >= type.banks) {
                 this.error('Bank number is out of range', section, ctx)
             } else if (section.bank === 0 && type.noBank0) {
                 this.error('Memory region does not allow bank 0', section, ctx)
-            } else if (typeof section.fixedAddress !== 'undefined' && (section.fixedAddress < type.start || section.fixedAddress > type.end)) {
+            } else if (section.fixedAddress !== undefined && (section.fixedAddress < type.start || section.fixedAddress > type.end)) {
                 this.error('Fixed address is outside of the memory region', section, ctx)
             } else {
                 return true
@@ -156,113 +232,135 @@ export default class Linker {
             return false
         })
 
-        const linkSections: ILinkSection[] = []
-
-        for (const section of sections) {
-            const link = this.allocate(linkSections, regionTypes, section, ctx)
-            if (link) {
-                linkSections.push(link)
+        sections = sections.sort((a, b) => {
+            if (a.region !== b.region) {
+                return a.region.localeCompare(b.region)
             }
-        }
-
-        linkSections.sort((a, b) => {
-            if (a.region === b.region && a.bank !== b.bank) {
-                return a.bank - b.bank
+            const aHasAddr = a.fixedAddress !== undefined
+            const bHasAddr = b.fixedAddress !== undefined
+            if (aHasAddr && !bHasAddr) {
+                return -1
+            } else if (!aHasAddr && bHasAddr) {
+                return 1
+            } else if (aHasAddr && bHasAddr) {
+                return a.fixedAddress! - b.fixedAddress!
             }
-            if (a.start !== b.start) {
-                return a.start - b.start
+            const aHasBank = a.bank !== undefined
+            const bHasBank = b.bank !== undefined
+            if (aHasBank && !bHasBank) {
+                return -1
+            } else if (!aHasBank && bHasBank) {
+                return 1
+            } else if (aHasBank && bHasBank) {
+                return a.bank! - b.bank!
             }
-            return a.end - b.end
+            const aHasAlign = a.alignment !== undefined
+            const bHasAlign = b.alignment !== undefined
+            if (aHasAlign && !bHasAlign) {
+                return -1
+            } else if (!aHasAlign && bHasAlign) {
+                return 1
+            }
+            return a.bytes.length - b.bytes.length
         })
+        return sections
+    }
 
-        for (const link of linkSections) {
-            this.compiler.logger.log('linkSection', `${link.region}[${link.bank}] ${this.hexString(link.start)} - ${this.hexString(link.end)} = ${link.section.id}`)
-        }
-
-        const labels = context.files.reduce((arr: ILabel[], file) => {
-            const line = file.lines[file.endLine]
-            if (line.eval && line.eval.afterState && line.eval.afterState.labels) {
-                arr = arr.concat(Object.values(line.eval.afterState.labels))
+    public getSymbolData(labels: ILabel[], linkSectionMap: { [key: string]: ILinkSection | undefined }): string {
+        return labels.map((label) => {
+            const link = linkSectionMap[label.section]
+            if (link) {
+                return `${this.hexString(link.bank, 2, true)}:${this.hexString(link.start + label.byteOffset, 4, true)} ${label.id}`
             }
-            return arr
-        }, [])
+            return undefined
+        }).sort().filter((label) => label).join('\r\n')
+    }
 
-        if (options.generateSymbolFile) {
-            ctx.symbolData = labels.map((label) => {
-                const link = linkSections.find((l) => l.section.id === label.section)
-                if (link) {
-                    return `${this.hexString(link.bank, 2, true)}:${this.hexString(link.start + label.byteOffset, 4, true)} ${label.id}`
-                }
-                return undefined
-            }).sort().filter((label) => label).join('\r\n')
+    public fillLinkSection(link: ILinkSection, data: Uint8Array): void {
+        if (link.region !== 'rom0' && link.region !== 'romx') {
+            return
         }
+        const index = 0x4000 * link.bank + link.start - (link.region === 'romx' ? 0x4000 : 0x0000)
+        this.compiler.logger.log('linkHole', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.bytes.length - 1, 5)} = ${link.section.id}`)
+        data.set(link.section.bytes, index)
+    }
 
-        const romLinks = linkSections.filter((l) => l.region === 'rom0' || l.region === 'romx')
-        const totalBanks = romLinks.reduce((p, c) => Math.max(p, c.bank), 0) + 1
-        const data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
-        data.fill(ctx.options.padding)
+    public getHoleLabelEquates(hole: ILinkHole, sectionLink: ILinkSection, labels: ILabel[], linkSectionMap: { [key: string]: ILinkSection | undefined }): { [key: string]: number } {
+        const labelEquates: { [key: string]: number } = {}
 
-        for (const link of romLinks) {
-            const index = 0x4000 * link.bank + link.start - (link.region === 'romx' ? 0x4000 : 0x0000)
-            this.compiler.logger.log('linkHole', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.bytes.length - 1, 5)} = ${link.section.id}`)
-            data.set(link.section.bytes, index)
-        }
-
-        for (const hole of context.holes) {
-            const sectionLink = linkSections.find((l) => l.section.id === hole.section)
-            const labelEquates: { [key: string]: number } = {}
-
-            if (!hole.line.eval) {
+        for (const label of labels) {
+            if (!label.exported && label.file !== hole.line.file.getRoot().scope) {
                 continue
             }
-
-            if (sectionLink) {
-                labelEquates['@'] = sectionLink.start + hole.byteOffset
-                labelEquates['@__BANK'] = sectionLink.bank
+            const labelId = label.id.indexOf('.') >= 0 ? label.id.substr(label.id.indexOf('.')) : label.id
+            if (hole.line.text.indexOf(labelId) === -1) {
+                continue
             }
-
-            for (const label of labels.filter((l) => l.exported || l.file === hole.line.file.getRoot().scope)) {
-                const link = linkSections.find((l) => l.section.id === label.section)
-                if (link) {
-                    labelEquates[label.id] = link.start + label.byteOffset
-                    labelEquates[`${label.id}__BANK`] = link.bank
-                }
+            const link = linkSectionMap[label.section]
+            if (link) {
+                labelEquates[label.id] = link.start + label.byteOffset
+                labelEquates[`${label.id}__BANK`] = link.bank
             }
-            let val = this.compiler.evaluator.calcConstExpr(hole.node, 'number', new EvaluatorContext(hole.line.eval.options, hole.line, {
-                ...hole.line.eval.beforeState,
-                file: hole.line.file.getRoot().scope,
-                line: hole.line.getLineNumber(),
-                numberEquates: {
-                    ...(hole.line.eval.beforeState && hole.line.eval.beforeState.numberEquates ? hole.line.eval.beforeState.numberEquates : {}),
-                    ...labelEquates
-                }
-            }))
-            if (sectionLink) {
-                if (hole.relative) {
-                    val = val - (sectionLink.start + hole.byteOffset) - 1
-                }
-                if (sectionLink.region === 'rom0' || sectionLink.region === 'romx') {
-                    const index = 0x4000 * sectionLink.bank + sectionLink.start - (sectionLink.region === 'romx' ? 0x4000 : 0x0000) + hole.byteOffset
-
-                    this.compiler.logger.log('linkHole', `Filling ${this.hexString(index)} - ${this.hexString(index + hole.byteLength - 1)} = ${this.hexString(val, hole.byteLength * 2)} ${hole.line.text.trim()}`)
-
-                    for (let i = 0; i < hole.byteLength; i++) {
-                        data[index + i] = val & 0xFF
-                        val = val >>> 8
-                    }
-                }
-            }
-
-            ctx.romData = data
         }
 
-        return ctx
+        labelEquates['@'] = sectionLink.start + hole.byteOffset
+        labelEquates['@__BANK'] = sectionLink.bank
+
+        return labelEquates
+    }
+
+    public getHoleState(hole: ILinkHole, labelEquates: { [key: string]: number }): ILineState | undefined {
+        if (!hole.line.eval) {
+            return undefined
+        }
+        return {
+            ...hole.line.eval.state,
+            file: hole.line.file.getRoot().scope,
+            line: hole.line.getLineNumber(),
+            inLabel: hole.label,
+            numberEquates: {
+                ...(hole.line.eval.state && hole.line.eval.state.numberEquates ? hole.line.eval.state.numberEquates : {}),
+                ...labelEquates
+            }
+        }
+    }
+
+    public getHoleValue(hole: ILinkHole, sectionLink: ILinkSection, labelEquates: { [key: string]: number }): number {
+        if (!hole.line.eval) {
+            return 0
+        }
+        let val = this.compiler.evaluator.calcConstExpr(hole.node, 'number', new EvaluatorContext(hole.line.eval.options, hole.line, this.getHoleState(hole, labelEquates)))
+        if (sectionLink) {
+            if (hole.relative) {
+                val = val - (sectionLink.start + hole.byteOffset) - 1
+            }
+        }
+        return val
+    }
+
+    public fillHole(hole: ILinkHole, labels: ILabel[], linkSectionMap: { [key: string]: ILinkSection | undefined }, data: Uint8Array): void {
+        const sectionLink = linkSectionMap[hole.section]
+        if (!sectionLink || (sectionLink.region !== 'rom0' && sectionLink.region !== 'romx')) {
+            return
+        }
+
+        const labelEquates = this.getHoleLabelEquates(hole, sectionLink, labels, linkSectionMap)
+        let val = this.getHoleValue(hole, sectionLink, labelEquates)
+
+        const index = 0x4000 * sectionLink.bank + sectionLink.start - (sectionLink.region === 'romx' ? 0x4000 : 0x0000) + hole.byteOffset
+
+        this.compiler.logger.log('linkHole', `Filling ${this.hexString(index)} - ${this.hexString(index + hole.byteLength - 1)} = ${this.hexString(val, hole.byteLength * 2)} ${hole.line.text.trim()}`)
+
+        for (let i = 0; i < hole.byteLength; i++) {
+            data[index + i] = val & 0xFF
+            val = val >>> 8
+        }
     }
 
     public allocate(linkSections: ILinkSection[], regionTypes: { [key: string]: IRegionType | undefined }, section: ISection, ctx: LinkerContext): ILinkSection | undefined {
-        const fixedAddr = typeof section.fixedAddress !== 'undefined'
-        const fixedBank = typeof section.bank !== 'undefined'
-        const alignment = typeof section.alignment !== 'undefined' ? (1 << section.alignment) : 0
+        const fixedAddr = section.fixedAddress !== undefined
+        const fixedBank = section.bank !== undefined
+        const alignment = section.alignment !== undefined ? (1 << section.alignment) : 0
         const region = section.region
 
         const type = regionTypes[region]
@@ -273,6 +371,17 @@ export default class Linker {
 
         let addr = fixedAddr ? section.fixedAddress! : type.start
         let bank = fixedBank ? section.bank! : (type.noBank0 ? 1 : 0)
+
+        if (fixedAddr && fixedBank) {
+            return {
+                region,
+                start: addr,
+                end: addr + section.bytes.length - 1,
+                bank,
+                section
+            }
+        }
+
         while (true) {
             if (!fixedAddr && alignment > 0 && (addr % alignment) !== 0) {
                 addr += alignment - (addr % alignment)

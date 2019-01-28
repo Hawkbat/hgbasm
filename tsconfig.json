@@ -4,9 +4,9 @@
 		"outDir": "./out/",
 		"module": "commonjs",
 		"moduleResolution": "node",
-		"target": "es2018",
+		"target": "esnext",
 		"lib": [
-			"es2018"
+			"esnext"
 		],
 		"strict": true,
 		"forceConsistentCasingInFileNames": true,

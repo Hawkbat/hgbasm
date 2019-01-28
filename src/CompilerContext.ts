@@ -32,6 +32,8 @@ export default class CompilerContext {
                 padding: 0x00,
                 exportAllLabels: false,
                 nopAfterHalt: true,
+                debugDefineName: '',
+                debugDefineValue: '1',
                 ...(options ? options.evaluator : {})
             },
             linker: {
@@ -40,6 +42,7 @@ export default class CompilerContext {
                 disableVramBanks: false,
                 disableWramBanks: false,
                 generateSymbolFile: false,
+                linkerScript: '',
                 ...(options ? options.linker : {})
             },
             fixer: {

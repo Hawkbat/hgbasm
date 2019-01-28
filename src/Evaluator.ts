@@ -28,8 +28,18 @@ interface IOpVariant {
 
 type OpRule = IOpVariant[]
 
-type EvaluatorRule = (state: ILineState, op: Node, label: Node | null, ctx: EvaluatorContext) => ILineState
+type EvaluatorRule = (state: ILineState, op: Node, label: Node | null, ctx: EvaluatorContext) => void
 type ConstExprRule = (op: Node, ctx: EvaluatorContext) => number | string
+
+const regexpCache: { [key: string]: RegExp } = {}
+
+function getCachedRegExp(key: string): RegExp {
+    if (!regexpCache[key]) {
+        regexpCache[key] = new RegExp(key, 'g')
+    }
+    regexpCache[key].lastIndex = 0
+    return regexpCache[key]
+}
 
 export default class Evaluator {
 
@@ -1867,914 +1877,617 @@ export default class Evaluator {
         ]
     }
 
+    public keywordRules: { [key: string]: EvaluatorRule } = {
+        equ: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            if (state.numberEquates && state.numberEquates[labelId]) {
+                this.error(`Cannot redefine existing equate "${labelId}"`, op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define number equate', labelId, 'as', this.calcConstExpr(op.children[0], 'number', ctx).toString())
+            state.numberEquates = state.numberEquates ? state.numberEquates : {}
+            state.numberEquates[labelId] = this.calcConstExpr(op.children[0], 'number', ctx)
+        },
+        equs: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            if (!labelId) {
+                this.error('Cannot define equate with no label', op.token, ctx)
+                return
+            }
+            if (state.stringEquates && state.stringEquates[labelId]) {
+                this.error(`Cannot redefine existing equate "${labelId}"`, op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define string equate', labelId, 'as', this.calcConstExpr(op.children[0], 'string', ctx))
+            state.stringEquates = state.stringEquates ? state.stringEquates : {}
+            state.stringEquates[labelId] = this.calcConstExpr(op.children[0], 'string', ctx)
+        },
+        set: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', this.calcConstExpr(op.children[0], 'number', ctx).toString())
+            state.sets = state.sets ? state.sets : {}
+            state.sets[labelId] = this.calcConstExpr(op.children[0], 'number', ctx)
+        },
+        charmap: (state, op, _, ctx) => {
+            if (op.children.length !== 2) {
+                this.error('Keyword needs exactly two arguments', op.token, ctx)
+                return
+            }
+            const key = this.calcConstExpr(op.children[0], 'string', ctx)
+            const val = this.calcConstExpr(op.children[1], 'number', ctx)
+            state.charmaps = state.charmaps ? state.charmaps : {}
+            state.charmaps[key] = val
+        },
+        if: (state, op, _, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            state.inConditionals = state.inConditionals ? state.inConditionals : []
+            state.inConditionals.unshift({ condition: this.calcConstExpr(op.children[0], 'number', ctx) !== 0 })
+        },
+        elif: (state, op, _, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            if (!state.inConditionals || !state.inConditionals.length) {
+                this.error('No matching if or elif to continue', op.token, ctx)
+                return
+            }
+            state.inConditionals[0].condition = this.calcConstExpr(op.children[0], 'number', ctx) !== 0
+        },
+        else: (state, op, _, ctx) => {
+            if (!state.inConditionals || !state.inConditionals.length) {
+                this.error('No matching if or elif to continue', op.token, ctx)
+                return
+            }
+            state.inConditionals[0].condition = !state.inConditionals[0].condition
+        },
+        endc: (state, op, _, ctx) => {
+            if (!state.inConditionals || !state.inConditionals.length) {
+                this.error('No matching if, elif, or else to terminate', op.token, ctx)
+                return
+            }
+            state.inConditionals.shift()
+        },
+        macro: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            const lineNumber = ctx.line.getLineNumber()
+            if (state.macros && state.macros[labelId]) {
+                this.error('Cannot redefine macros', op.token, ctx)
+                return
+            }
+            state.macros = state.macros ? state.macros : {}
+            state.macros[labelId] = {
+                id: labelId,
+                file: state.file,
+                startLine: lineNumber,
+                endLine: -1
+            }
+            state.inMacro = labelId
+        },
+        endm: (state, op, _, ctx) => {
+            const lineNumber = ctx.line.getLineNumber()
+            if (!state.inMacro || !state.macros) {
+                this.error('No macro definition found to terminate', op.token, ctx)
+                return
+            }
+            state.macros[state.inMacro].endLine = lineNumber
+            delete state.inMacro
+        },
+        shift: (state, op, _, ctx) => {
+            if (!state.inMacroCalls) {
+                this.error('Must be in a macro call to shift macro arguments', op.token, ctx)
+                return
+            }
+            state.inMacroCalls[0].argOffset++
+        },
+        rept: (state, op, _, ctx) => {
+            const lineNumber = ctx.line.getLineNumber()
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            const count = this.calcConstExpr(op.children[0], 'number', ctx)
+            state.inRepeats = state.inRepeats ? state.inRepeats : []
+            state.inRepeats.unshift({
+                count,
+                line: lineNumber,
+                file: state.file
+            })
+            state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
+        },
+        endr: (state, op, _, ctx) => {
+            const lineNumber = ctx.line.getLineNumber()
+            if (!state.inRepeats || !state.inRepeats.length) {
+                this.error('No matching rept to terminate', op.token, ctx)
+                return
+            }
+            const count = state.inRepeats[0].count
+            const startLine = state.inRepeats[0].line + 1
+            const endLine = lineNumber - 1
+
+            for (let i = 1; i < count; i++) {
+                const file = new FileContext(ctx.line.file.context, ctx.line.file, ctx.line.file.source, `${ctx.line.file.scope}(${lineNumber + 1}):rept`, startLine, endLine)
+                const line = file.lines[startLine]
+                line.eval = new EvaluatorContext(ctx.options, line, state)
+                this.compiler.compileFile(file, file.context.options)
+            }
+            state.inRepeats.shift()
+        },
+        union: (state, op, _, ctx) => {
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Unions must be defined within a section', op.token, ctx)
+                return
+            }
+            state.inUnions = state.inUnions ? state.inUnions : []
+            state.inUnions.unshift({
+                byteOffset: state.sections[state.inSections[0]].bytes.length,
+                byteLength: 0
+            })
+        },
+        nextu: (state, op, _, ctx) => {
+            if (!state.inUnions || !state.inUnions.length) {
+                this.error('No matching union to continue', op.token, ctx)
+                return
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Unions must be defined within a section', op.token, ctx)
+                return
+            }
+            const union = state.inUnions[0]
+            const section = state.sections[state.inSections[0]]
+
+            union.byteLength = Math.max(section.bytes.length - union.byteOffset, union.byteLength)
+            section.bytes = section.bytes.slice(0, union.byteOffset)
+        },
+        endu: (state, op, _, ctx) => {
+            if (!state.inUnions || !state.inUnions.length) {
+                this.error('No matching union to terminate', op.token, ctx)
+                return
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Unions must be defined within a section', op.token, ctx)
+                return
+            }
+            const union = state.inUnions[0]
+            const section = state.sections[state.inSections[0]]
+            section.bytes = section.bytes.slice(0, union.byteOffset).concat(new Array(Math.max(section.bytes.length - union.byteOffset, union.byteLength)).fill(ctx.options.padding))
+            state.inUnions.shift()
+        },
+        rsreset: (state) => {
+            state.rsCounter = 0
+        },
+        rsset: (state, op, _, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            state.rsCounter = this.calcConstExpr(op.children[0], 'number', ctx)
+        },
+        rb: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)).toString())
+            state.sets = state.sets ? state.sets : {}
+            state.sets[labelId] = state.rsCounter ? state.rsCounter : 0
+            state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)
+        },
+        rw: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2).toString())
+            state.sets = state.sets ? state.sets : {}
+            state.sets[labelId] = state.rsCounter ? state.rsCounter : 0
+            state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2
+        },
+        rl: (state, op, label, ctx) => {
+            const labelId = label ? label.token.value.replace(/:/g, '') : ''
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4).toString())
+            state.sets = state.sets ? state.sets : {}
+            state.sets[labelId] = state.rsCounter ? state.rsCounter : 0
+            state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4
+        },
+        ds: (state, op, label, ctx) => {
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot define bytes when not inside a section', op.token, ctx)
+                return
+            }
+            state.sections[state.inSections[0]].bytes.push(...new Array(this.calcConstExpr(op.children[0], 'number', ctx)).fill(ctx.options.padding))
+        },
+        db: (state, op, label, ctx) => {
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot define bytes when not inside a section', op.token, ctx)
+                return
+            }
+            if (op.children.length > 0) {
+                for (const child of op.children) {
+                    const hole: ILinkHole = {
+                        line: ctx.line,
+                        node: child,
+                        section: state.inSections[0],
+                        label: state.inLabel,
+                        byteOffset: state.sections[state.inSections[0]].bytes.length,
+                        byteLength: 1
+                    }
+                    let arg = this.calcConstExprOrHole(hole, child, 'either', ctx)
+                    if (typeof arg === 'string') {
+                        if (state.charmaps) {
+                            const arr: number[] = []
+                            const keys = Object.keys(state.charmaps).sort((a, b) => b.length - a.length)
+                            for (let i = 0; i < arg.length; i++) {
+                                const key = keys.find((str) => (arg as string).substr(i, str.length) === str)
+                                if (key) {
+                                    arr.push(state.charmaps[key])
+                                    i += key.length - 1
+                                } else {
+                                    arr.push(arg.charCodeAt(i))
+                                }
+                            }
+                            arg = arr.map((n) => String.fromCharCode(n)).join('')
+                        }
+                        state.sections[state.inSections[0]].bytes.push(...arg.split('').map((c) => c.charCodeAt(0) & 0xFF))
+                    } else {
+                        state.sections[state.inSections[0]].bytes.push(arg & 0xFF)
+                    }
+                }
+            } else {
+                state.sections[state.inSections[0]].bytes.push(ctx.options.padding)
+            }
+        },
+        dw: (state, op, label, ctx) => {
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot define bytes when not inside a section', op.token, ctx)
+                return
+            }
+            if (op.children.length > 0) {
+                for (const child of op.children) {
+                    const hole: ILinkHole = {
+                        line: ctx.line,
+                        node: child,
+                        section: state.inSections[0],
+                        label: state.inLabel,
+                        byteOffset: state.sections[state.inSections[0]].bytes.length,
+                        byteLength: 2
+                    }
+                    const arg = this.calcConstExprOrHole(hole, child, 'number', ctx)
+                    state.sections[state.inSections[0]].bytes.push((arg & 0x00FF) >>> 0, (arg & 0xFF00) >>> 8)
+                }
+            } else {
+                state.sections[state.inSections[0]].bytes.push(ctx.options.padding, ctx.options.padding)
+            }
+        },
+        dl: (state, op, label, ctx) => {
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot define bytes when not inside a section', op.token, ctx)
+                return
+            }
+            for (const child of op.children) {
+                this.error('Help', child.token, ctx)
+            }
+            if (op.children.length > 0) {
+                for (const child of op.children) {
+                    const hole: ILinkHole = {
+                        line: ctx.line,
+                        node: child,
+                        section: state.inSections[0],
+                        label: state.inLabel,
+                        byteOffset: state.sections[state.inSections[0]].bytes.length,
+                        byteLength: 4
+                    }
+                    const arg = this.calcConstExprOrHole(hole, child, 'number', ctx)
+                    state.sections[state.inSections[0]].bytes.push((arg & 0x000000FF) >>> 0, (arg & 0x0000FF00) >>> 8, (arg & 0x00FF0000) >>> 16, (arg & 0xFF000000) >>> 24)
+                }
+            } else {
+                state.sections[state.inSections[0]].bytes.push(ctx.options.padding, ctx.options.padding, ctx.options.padding, ctx.options.padding)
+            }
+        },
+        include: (state, op, label, ctx) => {
+            const lineNumber = ctx.line.getLineNumber()
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            const inc = ctx.line.file.context.includeFiles.find((incFile) => incFile.path.endsWith(this.calcConstExpr(op.children[0], 'string', ctx)))
+            if (!inc) {
+                this.error('Could not find a matching file to include', op.token, ctx)
+                return
+            }
+            const file = new FileContext(ctx.line.file.context, ctx.line.file, inc, `${ctx.line.file.scope}(${lineNumber + 1}):${inc.path}`)
+            const line = file.lines[0]
+            line.eval = new EvaluatorContext(ctx.options, line, state)
+            this.compiler.compileFile(file, file.context.options)
+        },
+        incbin: (state, op, label, ctx) => {
+            if (label) {
+                this.defineLabel(state, label, ctx)
+            }
+            if (op.children.length !== 1 && op.children.length !== 3) {
+                this.error('Keyword needs exactly one or exactly three arguments', op.token, ctx)
+            }
+            if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot include binary data when not inside a section', op.token, ctx)
+                return
+            }
+            const inc = ctx.line.file.context.includeFiles.find((incFile) => incFile.path.endsWith(this.calcConstExpr(op.children[0], 'string', ctx)))
+            if (!inc) {
+                this.error('Could not find a matching file to include', op.token, ctx)
+                return
+            }
+            const data = new Uint8Array(inc.buffer)
+            const startOffset = op.children.length === 3 ? this.calcConstExpr(op.children[1], 'number', ctx) : 0
+            const endOffset = op.children.length === 3 ? startOffset + this.calcConstExpr(op.children[2], 'number', ctx) : data.byteLength
+            state.sections[state.inSections[0]].bytes.push(...data.slice(startOffset, endOffset))
+        },
+        export: (state, op, _, ctx) => {
+            if (!op.children.length) {
+                this.error('Keyword needs at least one argument', op.token, ctx)
+                return
+            }
+            for (const child of op.children) {
+                const id = child.token.value
+                if (!state.labels || !state.labels[id]) {
+                    this.error('Label is not defined', child.token, ctx)
+                    continue
+                }
+                state.labels[id].exported = true
+            }
+        },
+        global: (state, op, _, ctx) => {
+            if (!op.children.length) {
+                this.error('Keyword needs at least one argument', op.token, ctx)
+                return
+            }
+            for (const child of op.children) {
+                const id = child.token.value
+                if (!state.labels || !state.labels[id]) {
+                    this.error('Label is not defined', child.token, ctx)
+                    continue
+                }
+                state.labels[id].exported = true
+            }
+        },
+        purge: (state, op, _, ctx) => {
+            if (!op.children.length) {
+                this.error('Keyword needs at least one argument', op.token, ctx)
+                return
+            }
+            for (const child of op.children) {
+                const id = child.token.value
+                let purged = false
+                if (state.stringEquates && state.stringEquates[id]) {
+                    delete state.stringEquates[id]
+                    this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
+                    purged = true
+                }
+                if (state.numberEquates && state.numberEquates[id]) {
+                    delete state.numberEquates[id]
+                    this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
+                    purged = true
+                }
+                if (state.sets && state.sets[id]) {
+                    delete state.sets[id]
+                    this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
+                    purged = true
+                }
+                if (state.macros && state.macros[id]) {
+                    delete state.macros[id]
+                    this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
+                    purged = true
+                }
+                if (!purged) {
+                    this.error('No symbol exists to purge', child.token, ctx)
+                }
+            }
+        },
+        section: (state, op, _, ctx) => {
+            const lineNumber = ctx.line.getLineNumber()
+            if (op.children.length === 0) {
+                this.error('Sections must be given a name', op.token, ctx)
+                return
+            }
+            if (op.children.length === 1) {
+                this.error('Sections must specify a memory region', op.token, ctx)
+                return
+            }
+            const id = this.calcConstExpr(op.children[0], 'string', ctx)
+            const regionOp = op.children[1]
+            const bankOp = op.children.find((n) => n.token.value.toLowerCase() === 'bank')
+            if (bankOp && bankOp.children.length !== 1) {
+                this.error('Bank number must be specified', bankOp.token, ctx)
+                return
+            }
+            const alignOp = op.children.find((n) => n.token.value.toLowerCase() === 'align')
+            if (alignOp && alignOp.children.length !== 1) {
+                this.error('Alignment number must be specified', alignOp.token, ctx)
+                return
+            }
+            state.sections = state.sections ? state.sections : {}
+            state.sections[id] = {
+                id,
+                file: state.file,
+                bytes: [],
+                startLine: lineNumber,
+                region: regionOp.token.value.toLowerCase(),
+                fixedAddress: (regionOp.children.length ? this.calcConstExpr(regionOp.children[0], 'number', ctx) : undefined),
+                bank: (bankOp ? this.calcConstExpr(bankOp.children[0], 'number', ctx) : undefined),
+                alignment: (alignOp ? this.calcConstExpr(alignOp.children[0], 'number', ctx) : undefined)
+            }
+            state.inSections = state.inSections ? state.inSections : []
+            state.inSections.unshift(id)
+        },
+        pushs: (state) => {
+            state.inSections = state.inSections ? state.inSections : []
+            state.inSections.unshift('')
+        },
+        pops: (state, op, _, ctx) => {
+            if (!state.inSections || !state.inSections.length || !state.inSections[0]) {
+                this.error('Cannot pop from empty section stack', op.token, ctx)
+                return
+            }
+            state.inSections.shift()
+        },
+        opt: (state, op, _, ctx) => {
+            for (const child of op.children) {
+                switch (child.token.value.charAt(0)) {
+                    case 'g': {
+                        state.options = state.options ? state.options : [{}]
+                        state.options[0].g = child.token.value.substr(1)
+                        continue
+                    }
+                    case 'b': {
+                        state.options = state.options ? state.options : [{}]
+                        state.options[0].b = child.token.value.substr(1)
+                        continue
+                    }
+                    case 'z': {
+                        state.options = state.options ? state.options : [{}]
+                        state.options[0].z = child.token.value.substr(1)
+                        continue
+                    }
+                    default: {
+                        this.error('Unknown option', child.token, ctx)
+                    }
+                }
+            }
+        },
+        pusho: (state) => {
+            state.options = state.options ? state.options : []
+            state.options.unshift({})
+        },
+        popo: (state, op, _, ctx) => {
+            if (!state.options || !state.options.length) {
+                this.error('Cannot pop from empty option stack', op.token, ctx)
+                return
+            }
+            state.options.shift()
+        },
+        warn: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.warn(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
+        },
+        fail: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.error(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
+        },
+        printt: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.info(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
+        },
+        printv: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.info(`$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`, undefined, ctx)
+        },
+        printi: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.info(`${this.calcConstExpr(op.children[0], 'number', ctx)}`, undefined, ctx)
+        },
+        printf: (_, op, __, ctx) => {
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            this.info(`${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, undefined, ctx)
+        }
+    }
+
     public evalRules: { [key: number]: EvaluatorRule } = {
         [NodeType.unary_operator]: (state, op, label, ctx) => {
             if (op.token.value === '=') {
                 const labelId = label ? label.token.value.replace(/:/g, '') : ''
-                return {
-                    ...state,
-                    sets: {
-                        ...state.sets,
-                        [labelId]: this.calcConstExpr(op.children[0], 'number', ctx)
-                    }
-                }
+                state.sets = state.sets ? state.sets : {}
+                state.sets[labelId] = this.calcConstExpr(op.children[0], 'number', ctx)
+            } else {
+                this.error('No unary operator evaluation rule matches', op.token, ctx)
             }
-            this.error('No unary operator evaluation rule matches', op.token, ctx)
-            return { ...state }
         },
         [NodeType.keyword]: (state, op, label, ctx) => {
-            const labelId = label ? label.token.value.replace(/:/g, '') : ''
-            const lineNumber = ctx.line.getLineNumber()
-            switch (op.token.value.toLowerCase()) {
-                case 'equ': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (state.numberEquates && state.numberEquates[labelId]) {
-                        this.error(`Cannot redefine existing equate "${labelId}"`, op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define number equate', labelId, 'as', this.calcConstExpr(op.children[0], 'number', ctx).toString())
-                    return {
-                        ...state,
-                        numberEquates: {
-                            ...state.numberEquates,
-                            [labelId]: this.calcConstExpr(op.children[0], 'number', ctx)
-                        }
-                    }
-                }
-                case 'equs': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (!labelId) {
-                        this.error('Cannot define equate with no label', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (state.stringEquates && state.stringEquates[labelId]) {
-                        this.error(`Cannot redefine existing equate "${labelId}"`, op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define string equate', labelId, 'as', this.calcConstExpr(op.children[0], 'string', ctx))
-                    return {
-                        ...state,
-                        stringEquates: {
-                            ...state.stringEquates,
-                            [labelId]: this.calcConstExpr(op.children[0], 'string', ctx)
-                        }
-                    }
-                }
-                case 'set': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', this.calcConstExpr(op.children[0], 'number', ctx).toString())
-                    return {
-                        ...state,
-                        sets: {
-                            ...state.sets,
-                            [labelId]: this.calcConstExpr(op.children[0], 'number', ctx)
-                        }
-                    }
-                }
-                case 'charmap': {
-                    if (op.children.length !== 2) {
-                        this.error('Keyword needs exactly two arguments', op.token, ctx)
-                        return { ...state }
-                    }
-                    const key = this.calcConstExpr(op.children[0], 'string', ctx)
-                    const val = this.calcConstExpr(op.children[1], 'number', ctx)
-                    return {
-                        ...state,
-                        charmaps: {
-                            ...state.charmaps,
-                            [key]: val
-                        }
-                    }
-                }
-                case 'if': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inConditionals: [
-                            {
-                                condition: this.calcConstExpr(op.children[0], 'number', ctx) !== 0
-                            },
-                            ...state.inConditionals ? state.inConditionals : []
-                        ]
-                    }
-                }
-                case 'elif': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (!state.inConditionals || !state.inConditionals.length) {
-                        this.error('No matching if or elif to continue', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inConditionals: [
-                            {
-                                ...state.inConditionals[0],
-                                condition: this.calcConstExpr(op.children[0], 'number', ctx) !== 0
-                            },
-                            ...state.inConditionals.slice(1)
-                        ]
-                    }
-                }
-                case 'else': {
-                    if (!state.inConditionals || !state.inConditionals.length) {
-                        this.error('No matching if or elif to continue', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inConditionals: [
-                            {
-                                ...state.inConditionals[0],
-                                condition: !state.inConditionals[0].condition
-                            },
-                            ...state.inConditionals.slice(1)
-                        ]
-                    }
-                }
-                case 'endc': {
-                    if (!state.inConditionals || !state.inConditionals.length) {
-                        this.error('No matching if, elif, or else to terminate', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inConditionals: [
-                            ...state.inConditionals.slice(1)
-                        ]
-                    }
-                }
-                case 'macro': {
-                    if (state.macros && state.macros[labelId]) {
-                        this.error('Cannot redefine macros', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        macros: {
-                            ...state.macros,
-                            [labelId]: {
-                                id: labelId,
-                                file: state.file,
-                                startLine: lineNumber,
-                                endLine: -1
-                            }
-                        },
-                        inMacro: labelId
-                    }
-                }
-                case 'endm': {
-                    if (!state.inMacro || !state.macros) {
-                        this.error('No macro definition found to terminate', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        macros: {
-                            ...state.macros,
-                            [state.inMacro]: {
-                                ...state.macros[state.inMacro],
-                                endLine: lineNumber
-                            }
-                        },
-                        inMacro: undefined
-                    }
-                }
-                case 'shift': {
-                    if (!state.inMacroCalls) {
-                        this.error('Must be in a macro call to shift macro arguments', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inMacroCalls: [
-                            {
-                                ...state.inMacroCalls[0],
-                                argOffset: state.inMacroCalls[0].argOffset + 1
-                            },
-                            ...state.inMacroCalls.slice(1)
-                        ]
-                    }
-                }
-                case 'rept': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    const count = this.calcConstExpr(op.children[0], 'number', ctx)
-                    return {
-                        ...state,
-                        inRepeats: [
-                            {
-                                count,
-                                line: ctx.line.getLineNumber(),
-                                file: state.file
-                            },
-                            ...(state.inRepeats ? state.inRepeats : [])
-                        ],
-                        macroCounter: state.macroCounter ? state.macroCounter + 1 : 1
-                    }
-                }
-                case 'endr': {
-                    if (!state.inRepeats || !state.inRepeats.length) {
-                        this.error('No matching rept to terminate', op.token, ctx)
-                        return { ...state }
-                    }
-                    const count = state.inRepeats[0].count
-                    const startLine = state.inRepeats[0].line + 1
-                    const endLine = lineNumber - 1
-                    let lastState: ILineState | undefined = { ...state }
-
-                    for (let i = 1; i < count; i++) {
-                        const file = new FileContext(ctx.line.file.context, ctx.line.file, ctx.line.file.source, `${ctx.line.file.scope}(${lineNumber + 1}):rept`, startLine, endLine)
-                        const firstLine = file.lines[startLine]
-                        const lastLine = file.lines[endLine]
-                        firstLine.eval = new EvaluatorContext(ctx.options, firstLine, lastState)
-                        this.compiler.compileFile(file, file.context.options)
-                        if (lastLine.eval) {
-                            lastState = lastLine.eval.afterState
-                        }
-                    }
-                    if (lastState) {
-                        return {
-                            ...lastState,
-                            inRepeats: lastState.inRepeats ? [...lastState.inRepeats.slice(1)] : [],
-                            line: state.line,
-                            file: state.file
-                        }
-                    }
-                    return { ...state }
-                }
-                case 'union': {
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Unions must be defined within a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    const section = state.sections[state.inSections[0]]
-                    return {
-                        ...state,
-                        inUnions: [
-                            {
-                                byteOffset: section.bytes.length,
-                                byteLength: 0
-                            },
-                            ...(state.inUnions ? state.inUnions : [])
-                        ]
-                    }
-                }
-                case 'nextu': {
-                    if (!state.inUnions || !state.inUnions.length) {
-                        this.error('No matching union to continue', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Unions must be defined within a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    const union = state.inUnions[0]
-                    const section = state.sections[state.inSections[0]]
-                    return {
-                        ...state,
-                        inUnions: [
-                            {
-                                ...state.inUnions[0],
-                                byteLength: Math.max(section.bytes.length - union.byteOffset, union.byteLength)
-                            },
-                            ...state.inUnions.slice(1)
-                        ],
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...section,
-                                bytes: section.bytes.slice(0, union.byteOffset)
-                            }
-                        }
-                    }
-                }
-                case 'endu': {
-                    if (!state.inUnions || !state.inUnions.length) {
-                        this.error('No matching union to terminate', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Unions must be defined within a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    const union = state.inUnions[0]
-                    const section = state.sections[state.inSections[0]]
-                    return {
-                        ...state,
-                        inUnions: [
-                            ...state.inUnions.slice(1)
-                        ],
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...section,
-                                bytes: [
-                                    ...section.bytes.slice(0, union.byteOffset),
-                                    ...new Array(Math.max(section.bytes.length - union.byteOffset, union.byteLength)).fill(ctx.options.padding)
-                                ]
-                            }
-                        }
-                    }
-                }
-                case 'rsreset': {
-                    return {
-                        ...state,
-                        rsCounter: 0
-                    }
-                }
-                case 'rsset': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        rsCounter: this.calcConstExpr(op.children[0], 'number', ctx)
-                    }
-                }
-                case 'rb': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)).toString())
-                    return {
-                        ...state,
-                        sets: {
-                            ...state.sets,
-                            [labelId]: state.rsCounter ? state.rsCounter : 0
-                        },
-                        rsCounter: (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)
-                    }
-                }
-                case 'rw': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2).toString())
-                    return {
-                        ...state,
-                        sets: {
-                            ...state.sets,
-                            [labelId]: state.rsCounter ? state.rsCounter : 0
-                        },
-                        rsCounter: (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2
-                    }
-                }
-                case 'rl': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.compiler.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4).toString())
-                    return {
-                        ...state,
-                        sets: {
-                            ...state.sets,
-                            [labelId]: state.rsCounter ? state.rsCounter : 0
-                        },
-                        rsCounter: (state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4
-                    }
-                }
-                case 'ds': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot define bytes when not inside a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...state.sections[state.inSections[0]],
-                                bytes: [
-                                    ...state.sections[state.inSections[0]].bytes,
-                                    ...new Array(this.calcConstExpr(op.children[0], 'number', ctx)).fill(ctx.options.padding)
-                                ]
-                            }
-                        }
-                    }
-                }
-                case 'db': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot define bytes when not inside a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (op.children.length > 0) {
-                        let s: ILineState = { ...state }
-                        for (const child of op.children) {
-                            const hole: ILinkHole = {
-                                line: ctx.line,
-                                node: child,
-                                section: state.inSections[0],
-                                byteOffset: state.sections[state.inSections[0]].bytes.length,
-                                byteLength: 1
-                            }
-                            let arg = this.calcConstExprOrHole(hole, child, 'either', ctx)
-                            if (typeof arg === 'string') {
-                                if (state.charmaps) {
-                                    const arr: number[] = []
-                                    const keys = Object.keys(state.charmaps).sort((a, b) => b.length - a.length)
-                                    for (let i = 0; i < arg.length; i++) {
-                                        const key = keys.find((str) => (arg as string).substr(i, str.length) === str)
-                                        if (key) {
-                                            arr.push(state.charmaps[key])
-                                            i += key.length - 1
-                                        } else {
-                                            arr.push(arg.charCodeAt(i))
-                                        }
-                                    }
-                                    arg = arr.map((n) => String.fromCharCode(n)).join('')
-                                }
-                            }
-                            if (s.sections && s.inSections) {
-                                s = {
-                                    ...s,
-                                    sections: {
-                                        ...s.sections,
-                                        [s.inSections[0]]: {
-                                            ...s.sections[s.inSections[0]],
-                                            bytes: [
-                                                ...s.sections[s.inSections[0]].bytes,
-                                                ...(typeof arg === 'string' ? arg.split('').map((c) => c.charCodeAt(0) & 0xFF) : [arg & 0xFF])
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return s
-                    }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...state.sections[state.inSections[0]],
-                                bytes: [
-                                    ...state.sections[state.inSections[0]].bytes,
-                                    ...[ctx.options.padding]
-                                ]
-                            }
-                        }
-                    }
-                }
-                case 'dw': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot define bytes when not inside a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (op.children.length > 0) {
-                        let s: ILineState = { ...state }
-                        for (const child of op.children) {
-                            const hole: ILinkHole = {
-                                line: ctx.line,
-                                node: child,
-                                section: state.inSections[0],
-                                byteOffset: state.sections[state.inSections[0]].bytes.length,
-                                byteLength: 2
-                            }
-                            const arg = this.calcConstExprOrHole(hole, child, 'number', ctx)
-                            if (s.sections && s.inSections) {
-                                s = {
-                                    ...s,
-                                    sections: {
-                                        ...s.sections,
-                                        [s.inSections[0]]: {
-                                            ...s.sections[s.inSections[0]],
-                                            bytes: [
-                                                ...s.sections[s.inSections[0]].bytes,
-                                                ...[(arg & 0x00FF) >>> 0, (arg & 0xFF00) >>> 8]
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return s
-                    }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...state.sections[state.inSections[0]],
-                                bytes: [
-                                    ...state.sections[state.inSections[0]].bytes,
-                                    ...[ctx.options.padding, ctx.options.padding]
-                                ]
-                            }
-                        }
-                    }
-                }
-                case 'dl': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot define bytes when not inside a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    for (const child of op.children) {
-                        this.error('Help', child.token, ctx)
-                    }
-                    if (op.children.length > 0) {
-                        let s: ILineState = { ...state }
-                        for (const child of op.children) {
-                            const hole: ILinkHole = {
-                                line: ctx.line,
-                                node: child,
-                                section: state.inSections[0],
-                                byteOffset: state.sections[state.inSections[0]].bytes.length,
-                                byteLength: 4
-                            }
-                            const arg = this.calcConstExprOrHole(hole, child, 'number', ctx)
-                            if (s.sections && s.inSections) {
-                                s = {
-                                    ...s,
-                                    sections: {
-                                        ...s.sections,
-                                        [s.inSections[0]]: {
-                                            ...s.sections[s.inSections[0]],
-                                            bytes: [
-                                                ...s.sections[s.inSections[0]].bytes,
-                                                ...[(arg & 0x000000FF) >>> 0, (arg & 0x0000FF00) >>> 8, (arg & 0x00FF0000) >>> 16, (arg & 0xFF000000) >>> 24]
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return s
-                    }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...state.sections[state.inSections[0]],
-                                bytes: [
-                                    ...state.sections[state.inSections[0]].bytes,
-                                    ...[ctx.options.padding, ctx.options.padding, ctx.options.padding, ctx.options.padding]
-                                ]
-                            }
-                        }
-                    }
-                }
-                case 'include': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    const inc = ctx.line.file.context.includeFiles.find((incFile) => incFile.path.endsWith(this.calcConstExpr(op.children[0], 'string', ctx)))
-                    if (!inc) {
-                        this.error('Could not find a matching file to include', op.token, ctx)
-                        return { ...state }
-                    }
-                    const file = new FileContext(ctx.line.file.context, ctx.line.file, inc, `${ctx.line.file.scope}(${lineNumber + 1}):${inc.path}`)
-                    const firstLine = file.lines[0]
-                    const lastLine = file.lines[file.lines.length - 1]
-                    firstLine.eval = new EvaluatorContext(ctx.options, firstLine, state)
-                    this.compiler.compileFile(file, file.context.options)
-                    if (lastLine.eval) {
-                        return {
-                            ...lastLine.eval.afterState,
-                            line: state.line,
-                            file: state.file
-                        }
-                    }
-                    return { ...state }
-                }
-                case 'incbin': {
-                    if (label) {
-                        state = this.defineLabel(state, label, ctx)
-                    }
-                    if (op.children.length !== 1 && op.children.length !== 3) {
-                        this.error('Keyword needs exactly one or exactly three arguments', op.token, ctx)
-                    }
-                    if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot include binary data when not inside a section', op.token, ctx)
-                        return { ...state }
-                    }
-                    const inc = ctx.line.file.context.includeFiles.find((incFile) => incFile.path.endsWith(this.calcConstExpr(op.children[0], 'string', ctx)))
-                    if (!inc) {
-                        this.error('Could not find a matching file to include', op.token, ctx)
-                        return { ...state }
-                    }
-                    const data = new Uint8Array(inc.buffer)
-                    const startOffset = op.children.length === 3 ? this.calcConstExpr(op.children[1], 'number', ctx) : 0
-                    const endOffset = op.children.length === 3 ? startOffset + this.calcConstExpr(op.children[2], 'number', ctx) : data.byteLength
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [state.inSections[0]]: {
-                                ...state.sections[state.inSections[0]],
-                                bytes: [
-                                    ...state.sections[state.inSections[0]].bytes,
-                                    ...data.slice(startOffset, endOffset)
-                                ]
-                            }
-                        }
-                    }
-
-                }
-                case 'export':
-                case 'global': {
-                    if (!op.children.length) {
-                        this.error('Keyword needs at least one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    let s = { ...state }
-                    for (const child of op.children) {
-                        const id = child.token.value
-                        if (!s.labels || !s.labels[id]) {
-                            this.error('Label is not defined', child.token, ctx)
-                            continue
-                        }
-                        s = {
-                            ...s,
-                            labels: {
-                                ...s.labels,
-                                [id]: {
-                                    ...s.labels[id],
-                                    exported: true
-                                }
-                            }
-                        }
-                    }
-                    return s
-                }
-                case 'purge': {
-                    if (!op.children.length) {
-                        this.error('Keyword needs at least one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    let s: ILineState = {
-                        ...state,
-                        stringEquates: { ...state.stringEquates },
-                        numberEquates: { ...state.numberEquates },
-                        sets: { ...state.sets },
-                        macros: { ...state.macros }
-                    }
-                    for (const child of op.children) {
-                        const id = child.token.value
-                        let purged = false
-                        if (s.stringEquates && s.stringEquates[id]) {
-                            const { [id]: _, ...stringEquates } = s.stringEquates
-                            s = { ...s, stringEquates }
-                            this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
-                            purged = true
-                        }
-                        if (s.numberEquates && s.numberEquates[id]) {
-                            const { [id]: _, ...numberEquates } = s.numberEquates
-                            s = { ...s, numberEquates }
-                            this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
-                            purged = true
-                        }
-                        if (s.sets && s.sets[id]) {
-                            const { [id]: _, ...sets } = s.sets
-                            s = { ...s, sets }
-                            this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
-                            purged = true
-                        }
-                        if (s.macros && s.macros[id]) {
-                            const { [id]: _, ...macros } = s.macros
-                            s = { ...s, macros }
-                            this.compiler.logger.log('purgeSymbol', 'Purge string equate', id)
-                            purged = true
-                        }
-                        if (!purged) {
-                            this.error('No symbol exists to purge', child.token, ctx)
-                        }
-                    }
-                    return s
-                }
-                case 'section': {
-                    if (op.children.length === 0) {
-                        this.error('Sections must be given a name', op.token, ctx)
-                        return { ...state }
-                    }
-                    if (op.children.length === 1) {
-                        this.error('Sections must specify a memory region', op.token, ctx)
-                        return { ...state }
-                    }
-                    const id = this.calcConstExpr(op.children[0], 'string', ctx)
-                    const regionOp = op.children[1]
-                    const bankOp = op.children.find((n) => n.token.value.toLowerCase() === 'bank')
-                    if (bankOp && bankOp.children.length !== 1) {
-                        this.error('Bank number must be specified', bankOp.token, ctx)
-                        return { ...state }
-                    }
-                    const alignOp = op.children.find((n) => n.token.value.toLowerCase() === 'align')
-                    if (alignOp && alignOp.children.length !== 1) {
-                        this.error('Alignment number must be specified', alignOp.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [id]: {
-                                id,
-                                file: state.file,
-                                bytes: [],
-                                startLine: lineNumber,
-                                region: regionOp.token.value.toLowerCase(),
-                                fixedAddress: (regionOp.children.length ? this.calcConstExpr(regionOp.children[0], 'number', ctx) : undefined),
-                                bank: (bankOp ? this.calcConstExpr(bankOp.children[0], 'number', ctx) : undefined),
-                                alignment: (alignOp ? this.calcConstExpr(alignOp.children[0], 'number', ctx) : undefined)
-                            }
-                        },
-                        inSections: [
-                            id,
-                            ...(state.inSections ? state.inSections.slice(1) : [])
-                        ]
-                    }
-                }
-                case 'pushs': {
-                    return {
-                        ...state,
-                        inSections: [
-                            '',
-                            ...(state.inSections ? state.inSections : [])
-                        ]
-                    }
-                }
-                case 'pops': {
-                    if (!state.inSections || !state.inSections.length || !state.inSections[0]) {
-                        this.error('Cannot pop from empty section stack', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        inSections: state.inSections.slice(1)
-                    }
-                }
-                case 'opt': {
-                    let s: ILineState = { ...state }
-                    for (const child of op.children) {
-                        switch (child.token.value.charAt(0)) {
-                            case 'g': {
-                                s = {
-                                    ...s,
-                                    options: [
-                                        {
-                                            ...(s.options ? s.options[0] : {}),
-                                            g: child.token.value.substr(1)
-                                        },
-                                        ...(s.options ? s.options.slice(1) : [])
-                                    ]
-                                }
-                                continue
-                            }
-                            case 'b': {
-                                s = {
-                                    ...s,
-                                    options: [
-                                        {
-                                            ...(s.options ? s.options[0] : {}),
-                                            b: child.token.value.substr(1)
-                                        },
-                                        ...(s.options ? s.options.slice(1) : [])
-                                    ]
-                                }
-                                continue
-                            }
-                            default: {
-                                this.error('Unknown option', child.token, ctx)
-                            }
-                        }
-                    }
-                    return s
-                }
-                case 'pusho': {
-                    return {
-                        ...state,
-                        options: [
-                            {},
-                            ...(state.options ? state.options : [])
-                        ]
-                    }
-                }
-                case 'popo': {
-                    if (!state.options || !state.options.length) {
-                        this.error('Cannot pop from empty option stack', op.token, ctx)
-                        return { ...state }
-                    }
-                    return {
-                        ...state,
-                        options: state.options.slice(1)
-                    }
-                }
-                case 'warn': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.warn(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
-                    return { ...state }
-                }
-                case 'fail': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.error(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
-                    return { ...state }
-                }
-                case 'printt': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.info(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
-                    return { ...state }
-                }
-                case 'printv': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.info(`$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`, undefined, ctx)
-                    return { ...state }
-                }
-                case 'printi': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.info(`${this.calcConstExpr(op.children[0], 'number', ctx)}`, undefined, ctx)
-                    return { ...state }
-                }
-                case 'printf': {
-                    if (op.children.length !== 1) {
-                        this.error('Keyword needs exactly one argument', op.token, ctx)
-                        return { ...state }
-                    }
-                    this.info(`${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, undefined, ctx)
-                    return { ...state }
-                }
+            const rule = this.keywordRules[op.token.value.toLowerCase()]
+            if (!rule) {
+                this.error('No keyword evaluation rule matches', op.token, ctx)
+                return
             }
-            this.error('No keyword evaluation rule matches', op.token, ctx)
-            return { ...state }
+            return rule(state, op, label, ctx)
         },
         [NodeType.opcode]: (state, op, label, ctx) => {
             if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
                 this.error('Instructions must be placed within a section', op.token, ctx)
-                return { ...state }
+                return
             }
 
             const sectionId = state.inSections[0]
             const sectionLength = state.sections[state.inSections[0]].bytes.length
 
             if (label) {
-                state = this.defineLabel(state, label, ctx)
+                this.defineLabel(state, label, ctx)
             }
 
             const rule = this.opRules[op.token.value.toLowerCase()]
             if (!rule) {
-                this.error('Unimplemented opcode', op.token, ctx)
-                return { ...state }
+                this.error('No opcode evalution rule matches', op.token, ctx)
+                return
             }
 
             if (!rule.some((variant) => variant.args.length === op.children.length)) {
                 this.error('Incorrect number of arguments', op.token, ctx)
-                return { ...state }
+                return
             }
 
             for (const variant of rule) {
@@ -2885,6 +2598,7 @@ export default class Evaluator {
                                     line: ctx.line,
                                     node: op.children[i],
                                     section: sectionId,
+                                    label: state.inLabel,
                                     byteOffset: sectionLength + bytes.length,
                                     byteLength: 1
                                 }
@@ -2897,6 +2611,7 @@ export default class Evaluator {
                                     line: ctx.line,
                                     node: op.children[i],
                                     section: sectionId,
+                                    label: state.inLabel,
                                     byteOffset: sectionLength + bytes.length,
                                     byteLength: 2
                                 }
@@ -2909,6 +2624,7 @@ export default class Evaluator {
                                     line: ctx.line,
                                     node: op.children[i],
                                     section: sectionId,
+                                    label: state.inLabel,
                                     byteOffset: sectionLength + bytes.length,
                                     byteLength: 1,
                                     relative: true
@@ -2917,11 +2633,25 @@ export default class Evaluator {
                                 bytes.push(val & 0xFF)
                                 break
                             }
+                            case 'sp+e8': {
+                                const hole: ILinkHole = {
+                                    line: ctx.line,
+                                    node: op.children[i],
+                                    section: sectionId,
+                                    label: state.inLabel,
+                                    byteOffset: sectionLength + bytes.length,
+                                    byteLength: 1
+                                }
+                                const val = this.calcConstExprOrHole(hole, op.children[i].children[1], 'number', ctx)
+                                bytes.push(val & 0xFF)
+                                break
+                            }
                             case '[n8]': {
                                 const hole: ILinkHole = {
                                     line: ctx.line,
                                     node: op.children[i].children[0],
                                     section: sectionId,
+                                    label: state.inLabel,
                                     byteOffset: sectionLength + bytes.length,
                                     byteLength: 1
                                 }
@@ -2934,6 +2664,7 @@ export default class Evaluator {
                                     line: ctx.line,
                                     node: op.children[i].children[0],
                                     section: sectionId,
+                                    label: state.inLabel,
                                     byteOffset: sectionLength + bytes.length,
                                     byteLength: 2
                                 }
@@ -2951,65 +2682,245 @@ export default class Evaluator {
                     if (ctx.options.nopAfterHalt && op.token.value.toLowerCase() === 'halt') {
                         bytes.push(0x00)
                     }
-                    return {
-                        ...state,
-                        sections: {
-                            ...state.sections,
-                            [sectionId]: {
-                                ...state.sections![sectionId],
-                                bytes: [
-                                    ...state.sections![sectionId].bytes,
-                                    ...bytes
-                                ]
-                            }
-                        }
-                    }
+                    state.sections[sectionId].bytes.push(...bytes)
+                    return
                 }
             }
             this.error('No matching instruction variant', op.token, ctx)
-            return { ...state }
         },
         [NodeType.macro_call]: (state, op, label, ctx) => {
             if (label) {
-                state = this.defineLabel(state, label, ctx)
+                this.defineLabel(state, label, ctx)
             }
             if (!state.macros || !state.macros[op.token.value]) {
                 this.error('Unimplemented macro call', op.token, ctx)
-                return { ...state }
+                return
             }
+
             const macro = state.macros[op.token.value]
             const startLine = macro.startLine + 1
             const endLine = macro.endLine - 1
             const srcFile = ctx.line.file.source.path === macro.file ? ctx.line.file.source : ctx.line.file.context.includeFiles.find((inc) => inc.path === macro.file)
             if (!srcFile) {
                 this.error('Macro exists in out-of-scope source file', op.token, ctx)
-                return { ...state }
+                return
             }
-            const file = new FileContext(ctx.line.file.context, ctx.line.file, srcFile, `${ctx.line.file.scope}(${ctx.line.getLineNumber() + 1}):${srcFile.path}`, startLine, endLine)
-            const firstLine = file.lines[startLine]
-            const lastLine = file.lines[endLine]
-            firstLine.eval = new EvaluatorContext(ctx.options, firstLine, {
-                ...state,
-                inMacroCalls: [
-                    {
-                        id: op.token.value,
-                        args: op.children.map((n) => n.token.value),
-                        argOffset: 0
-                    },
-                    ...(state.inMacroCalls ? state.inMacroCalls : [])
-                ],
-                macroCounter: state.macroCounter ? state.macroCounter + 1 : 1
+
+            state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
+            state.inMacroCalls.unshift({
+                id: op.token.value,
+                args: op.children.map((n) => n.token.value),
+                argOffset: 0
             })
+            state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
+
+            const file = new FileContext(ctx.line.file.context, ctx.line.file, srcFile, `${ctx.line.file.scope}(${ctx.line.getLineNumber() + 1}):${srcFile.path}`, startLine, endLine)
+            const line = file.lines[startLine]
+            line.eval = new EvaluatorContext(ctx.options, line, state)
             this.compiler.compileFile(file, file.context.options)
-            if (lastLine.eval) {
-                return {
-                    ...lastLine.eval.afterState,
-                    inMacroCalls: lastLine.eval.afterState.inMacroCalls ? [...lastLine.eval.afterState.inMacroCalls.slice(1)] : [],
-                    line: state.line,
-                    file: state.file
-                }
+
+            state.inMacroCalls.shift()
+        }
+    }
+
+    public functionRules: { [key: string]: ConstExprRule } = {
+        div: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
+                return Math.floor((a / b) * 65536)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return 0
             }
-            return { ...state }
+        },
+        mul: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
+                return Math.floor((a * b) * 65536)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        sin: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.sin(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        cos: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.cos(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        tan: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.tan(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        asin: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.asin(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        acos: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.acos(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        atan: (op, ctx) => {
+            if (op.children.length === 2) {
+                const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                return Math.floor(Math.atan(n) * 65536)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        atan2: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
+                const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
+                return Math.floor(Math.atan2(b, a) * 65536)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        strlen: (op, ctx) => {
+            if (op.children.length === 2) {
+                return this.calcConstExpr(op.children[1], 'string', ctx).length
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        strcat: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'string', ctx)
+                const b = this.calcConstExpr(op.children[2], 'string', ctx)
+                return a + b
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        strcmp: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'string', ctx)
+                const b = this.calcConstExpr(op.children[2], 'string', ctx)
+                return a.localeCompare(b)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        strin: (op, ctx) => {
+            if (op.children.length === 3) {
+                const a = this.calcConstExpr(op.children[1], 'string', ctx)
+                const b = this.calcConstExpr(op.children[2], 'string', ctx)
+                return a.indexOf(b) + 1
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        strsub: (op, ctx) => {
+            if (op.children.length === 4) {
+                const a = this.calcConstExpr(op.children[1], 'string', ctx)
+                const b = this.calcConstExpr(op.children[2], 'number', ctx)
+                const c = this.calcConstExpr(op.children[3], 'number', ctx)
+                return a.substr(b - 1, c)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        strupr: (op, ctx) => {
+            if (op.children.length === 2) {
+                return this.calcConstExpr(op.children[1], 'string', ctx).toUpperCase()
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        strlwr: (op, ctx) => {
+            if (op.children.length === 2) {
+                return this.calcConstExpr(op.children[1], 'string', ctx).toLowerCase()
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        bank: (op, ctx) => {
+            const id = `${op.children[1].token.value.startsWith('.') ? ctx.state.inLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
+            if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
+                return ctx.state.numberEquates[id]
+            } else {
+                this.error('Bank is not known or no matching symbol', op.children[1].token, ctx)
+                return 0
+            }
+        },
+        def: (op, ctx) => {
+            if (op.children.length === 2) {
+                const id = op.children[1].token.value
+                if (ctx.state.labels && ctx.state.labels[id]) {
+                    return 1
+                }
+                if (ctx.state.numberEquates && ctx.state.numberEquates[id]) {
+                    return 1
+                }
+                if (ctx.state.stringEquates && ctx.state.stringEquates[id]) {
+                    return 1
+                }
+                if (ctx.state.sets && ctx.state.sets[id]) {
+                    return 1
+                }
+                if (ctx.state.macros && ctx.state.macros[id]) {
+                    return 1
+                }
+                return 0
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        high: (op, ctx) => {
+            if (op.children.length === 2) {
+                return (this.calcConstExpr(op.children[1], 'number', ctx) & 0xFF00) >>> 8
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        low: (op, ctx) => {
+            if (op.children.length === 2) {
+                return (this.calcConstExpr(op.children[1], 'number', ctx) & 0x00FF) >>> 0
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
         }
     }
 
@@ -3042,9 +2953,9 @@ export default class Evaluator {
         },
         '-': (op, ctx) => {
             if (op.children.length === 2) {
-                if (ctx.beforeState.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
-                    const left = ctx.beforeState.labels[op.children[0].token.value]
-                    const right = ctx.beforeState.labels[op.children[1].token.value]
+                if (ctx.state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
+                    const left = ctx.state.labels[op.children[0].token.value]
+                    const right = ctx.state.labels[op.children[1].token.value]
                     if (left && right && left.section === right.section) {
                         return left.byteOffset - right.byteOffset
                     }
@@ -3207,22 +3118,25 @@ export default class Evaluator {
             if (source.startsWith('"') && source.endsWith('"')) {
                 source = source.substring(1, source.length - 1)
             }
-            if (source.includes('\\') || source.includes('{')) {
-                source = source.replace(/(?<!\\)\\"/g, '"')
-                source = source.replace(/(?<!\\)\\,/g, ',')
-                source = source.replace(/(?<!\\)\\{/g, '{')
-                source = source.replace(/(?<!\\)\\}/g, '}')
-                source = source.replace(/(?<!\\)\\n/g, '\n')
-                source = source.replace(/(?<!\\)\\t/g, '\t')
+            if (source.indexOf('\\') >= 0 || source.indexOf('{') >= 0) {
+                source = source.replace(getCachedRegExp('(?<!\\\\)\\\\"'), '"')
+                source = source.replace(getCachedRegExp('/(?<!\\\\)\\\\,'), ',')
+                source = source.replace(getCachedRegExp('/(?<!\\\\)\\\\{'), '{')
+                source = source.replace(getCachedRegExp('/(?<!\\\\)\\\\}'), '}')
+                source = source.replace(getCachedRegExp('/(?<!\\\\)\\\\n'), '\n')
+                source = source.replace(getCachedRegExp('/(?<!\\\\)\\\\t'), '\t')
 
-                if (ctx.line.eval && ctx.line.eval.beforeState) {
+                if (ctx.line.eval && ctx.line.eval.state) {
                     let anyReplaced = true
                     while (anyReplaced) {
                         anyReplaced = false
-                        if (ctx.line.eval.beforeState.sets) {
-                            for (const key of Object.keys(ctx.line.eval.beforeState.sets)) {
-                                const value = `$${ctx.line.eval.beforeState.sets[key].toString(16).toUpperCase()}`
-                                const regex = new RegExp(`\\{${key}\\}`, 'g')
+                        if (ctx.line.eval.state.sets) {
+                            for (const key of Object.keys(ctx.line.eval.state.sets)) {
+                                if (source.indexOf(key) === -1) {
+                                    continue
+                                }
+                                const value = `$${ctx.line.eval.state.sets[key].toString(16).toUpperCase()}`
+                                const regex = getCachedRegExp(`\\{${key}\\}`)
                                 const newSource = this.applySourceReplace(source, regex, value)
                                 if (source !== newSource) {
                                     source = newSource
@@ -3230,10 +3144,13 @@ export default class Evaluator {
                                 }
                             }
                         }
-                        if (ctx.line.eval.beforeState.numberEquates) {
-                            for (const key of Object.keys(ctx.line.eval.beforeState.numberEquates)) {
-                                const value = `$${ctx.line.eval.beforeState.numberEquates[key].toString(16).toUpperCase()} `
-                                const regex = new RegExp(`\\{${key}\\}`, 'g')
+                        if (ctx.line.eval.state.numberEquates) {
+                            for (const key of Object.keys(ctx.line.eval.state.numberEquates)) {
+                                if (source.indexOf(key) === -1) {
+                                    continue
+                                }
+                                const value = `$${ctx.line.eval.state.numberEquates[key].toString(16).toUpperCase()}`
+                                const regex = getCachedRegExp(`\\{${key}\\}`)
                                 const newSource = this.applySourceReplace(source, regex, value)
                                 if (source !== newSource) {
                                     source = newSource
@@ -3241,10 +3158,13 @@ export default class Evaluator {
                                 }
                             }
                         }
-                        if (ctx.line.eval.beforeState.stringEquates) {
-                            for (const key of Object.keys(ctx.line.eval.beforeState.stringEquates)) {
-                                const value = ctx.line.eval.beforeState.stringEquates[key]
-                                const regex = new RegExp(`\\{${key}\\}`, 'g')
+                        if (ctx.line.eval.state.stringEquates) {
+                            for (const key of Object.keys(ctx.line.eval.state.stringEquates)) {
+                                if (source.indexOf(key) === -1) {
+                                    continue
+                                }
+                                const value = ctx.line.eval.state.stringEquates[key]
+                                const regex = getCachedRegExp(`\\{${key}\\}`)
                                 const newSource = this.applySourceReplace(source, regex, value)
                                 if (source !== newSource) {
                                     source = newSource
@@ -3252,12 +3172,15 @@ export default class Evaluator {
                                 }
                             }
                         }
-                        if (ctx.line.eval.beforeState.inMacroCalls && ctx.line.eval.beforeState.inMacroCalls.length) {
-                            const macroCall = ctx.line.eval.beforeState.inMacroCalls[0]
+                        if (ctx.line.eval.state.inMacroCalls && ctx.line.eval.state.inMacroCalls.length) {
+                            const macroCall = ctx.line.eval.state.inMacroCalls[0]
                             for (let key = 1; key < 10; key++) {
+                                if (source.indexOf(`\\${key}`) === -1) {
+                                    continue
+                                }
                                 const offset = key - 1 + macroCall.argOffset
                                 const value = macroCall.args[offset] ? macroCall.args[offset] : ''
-                                const regex = new RegExp(`\\\\${key}`, 'g')
+                                const regex = getCachedRegExp(`\\\\${key}`)
                                 const newSource = this.applySourceReplace(source, regex, value)
                                 if (source !== newSource) {
                                     source = newSource
@@ -3265,246 +3188,51 @@ export default class Evaluator {
                                 }
                             }
                         }
-                        if (typeof ctx.line.eval.beforeState.macroCounter !== 'undefined') {
-                            const value = `_${ctx.line.eval.beforeState.macroCounter}`
-                            const regex = new RegExp(`\\\\@`, 'g')
-                            const newSource = this.applySourceReplace(source, regex, value)
-                            if (source !== newSource) {
-                                source = newSource
-                                anyReplaced = true
+                        if (ctx.line.eval.state.macroCounter !== undefined) {
+                            if (source.indexOf('\\@') >= 0) {
+                                const value = `_${ctx.line.eval.state.macroCounter}`
+                                const regex = getCachedRegExp(`\\\\@`)
+                                const newSource = this.applySourceReplace(source, regex, value)
+                                if (source !== newSource) {
+                                    source = newSource
+                                    anyReplaced = true
+                                }
                             }
                         }
                     }
                 }
             }
-
             if (source !== op.token.value) {
                 this.compiler.logger.log('stringExpansion', 'String expansion of', op.token.value, 'to', source)
             }
             return source
         },
         [TokenType.open_paren]: (op, ctx) => {
-            switch (op.children[0].token.value.toLowerCase()) {
-                case 'div': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
-                        return Math.floor((a / b) * 65536)
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'mul': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
-                        return Math.floor((a * b) * 65536)
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'sin': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.sin(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'cos': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.cos(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'tan': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.tan(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'asin': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.asin(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'acos': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.acos(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'atan': {
-                    if (op.children.length === 2) {
-                        const n = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        return Math.floor(Math.atan(n) * 65536)
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'atan2': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'number', ctx) / 65536
-                        const b = this.calcConstExpr(op.children[2], 'number', ctx) / 65536
-                        return Math.floor(Math.atan2(b, a) * 65536)
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'strlen': {
-                    if (op.children.length === 2) {
-                        return this.calcConstExpr(op.children[1], 'string', ctx).length
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'strcat': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'string', ctx)
-                        const b = this.calcConstExpr(op.children[2], 'string', ctx)
-                        return a + b
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'strcmp': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'string', ctx)
-                        const b = this.calcConstExpr(op.children[2], 'string', ctx)
-                        return a.localeCompare(b)
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'strin': {
-                    if (op.children.length === 3) {
-                        const a = this.calcConstExpr(op.children[1], 'string', ctx)
-                        const b = this.calcConstExpr(op.children[2], 'string', ctx)
-                        return a.indexOf(b) + 1
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'strsub': {
-                    if (op.children.length === 4) {
-                        const a = this.calcConstExpr(op.children[1], 'string', ctx)
-                        const b = this.calcConstExpr(op.children[2], 'number', ctx)
-                        const c = this.calcConstExpr(op.children[3], 'number', ctx)
-                        return a.substr(b - 1, c)
-                    } else {
-                        this.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'strupr': {
-                    if (op.children.length === 2) {
-                        return this.calcConstExpr(op.children[1], 'string', ctx).toUpperCase()
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'strlwr': {
-                    if (op.children.length === 2) {
-                        return this.calcConstExpr(op.children[1], 'string', ctx).toLowerCase()
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return ''
-                    }
-                }
-                case 'bank': {
-                    const id = `${op.children[1].token.value.startsWith('.') ? ctx.beforeState.inLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
-                    if (ctx.beforeState.numberEquates && ctx.beforeState.numberEquates.hasOwnProperty(id)) {
-                        return ctx.beforeState.numberEquates[id]
-                    } else {
-                        this.error('Bank is not known or no matching symbol', op.children[1].token, ctx)
-                        return 0
-                    }
-                }
-                case 'def': {
-                    if (op.children.length === 2) {
-                        const id = op.children[1].token.value
-                        if (ctx.beforeState.labels && ctx.beforeState.labels[id]) {
-                            return 1
-                        }
-                        if (ctx.beforeState.numberEquates && ctx.beforeState.numberEquates[id]) {
-                            return 1
-                        }
-                        if (ctx.beforeState.stringEquates && ctx.beforeState.stringEquates[id]) {
-                            return 1
-                        }
-                        if (ctx.beforeState.sets && ctx.beforeState.sets[id]) {
-                            return 1
-                        }
-                        if (ctx.beforeState.macros && ctx.beforeState.macros[id]) {
-                            return 1
-                        }
-                        return 0
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'high': {
-                    if (op.children.length === 2) {
-                        return (this.calcConstExpr(op.children[1], 'number', ctx) & 0xFF00) >>> 8
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
-                case 'low': {
-                    if (op.children.length === 2) {
-                        return (this.calcConstExpr(op.children[1], 'number', ctx) & 0x00FF) >>> 0
-                    } else {
-                        this.error('Function needs exactly one argument', op.children[0].token, ctx)
-                        return 0
-                    }
-                }
+            const rule = this.functionRules[op.children[0].token.value.toLowerCase()]
+            if (!rule) {
+                this.error('Unknown function name', op.children[0].token, ctx)
+                return 0
             }
-            this.error('Unknown function name', op.children[0].token, ctx)
-            return 0
+            return rule(op, ctx)
         },
         [TokenType.open_bracket]: (op, ctx) => {
             return this.calcConstExpr(op.children[0], 'number', ctx)
         },
         [TokenType.identifier]: (op, ctx) => {
-            const id = op.token.value.startsWith('.') ? ctx.beforeState.inLabel + op.token.value : op.token.value
+            const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
             switch (id) {
                 case '_NARG':
-                    if (ctx.beforeState.inMacroCalls && ctx.beforeState.inMacroCalls.length) {
-                        return ctx.beforeState.inMacroCalls[0].args.length
+                    if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
+                        return ctx.state.inMacroCalls[0].args.length
                     }
             }
-            if (ctx.beforeState.numberEquates && ctx.beforeState.numberEquates.hasOwnProperty(id)) {
-                return ctx.beforeState.numberEquates[id]
-            } else if (ctx.beforeState.stringEquates && ctx.beforeState.stringEquates.hasOwnProperty(id)) {
-                return ctx.beforeState.stringEquates[id]
-            } else if (ctx.beforeState.sets && ctx.beforeState.sets.hasOwnProperty(id)) {
-                return ctx.beforeState.sets[id]
-            } else if (ctx.beforeState.labels && ctx.beforeState.labels.hasOwnProperty(id)) {
+            if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
+                return ctx.state.numberEquates[id]
+            } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(id)) {
+                return ctx.state.stringEquates[id]
+            } else if (ctx.state.sets && ctx.state.sets.hasOwnProperty(id)) {
+                return ctx.state.sets[id]
+            } else if (ctx.state.labels && ctx.state.labels.hasOwnProperty(id)) {
                 this.error('Labels cannot be used in constant expressions', op.token, ctx)
                 return 0
             } else {
@@ -3537,15 +3265,7 @@ export default class Evaluator {
     }
 
     public evaluate(line: LineContext, options: IEvaluatorOptions): EvaluatorContext {
-        const ctx = new EvaluatorContext(options, line)
-
-        const lineNumber = line.getLineNumber()
-
-        ctx.beforeState = {
-            ...(line.eval ? line.eval.beforeState : {}),
-            line: lineNumber,
-            file: line.file.source.path
-        }
+        const ctx = new EvaluatorContext(options, line, line.eval ? line.eval.state : undefined)
 
         if (!line.lex) {
             this.error('Line was evaluated before lexing, aborting', undefined, ctx)
@@ -3557,12 +3277,19 @@ export default class Evaluator {
             return ctx
         }
 
-        const checkConditionals = !ctx.beforeState.inConditionals || !ctx.beforeState.inConditionals.length || ctx.beforeState.inConditionals.every((cond) => cond.condition) || (line.lex.tokens && line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
+        const checkConditionals =
+            !ctx.state.inConditionals ||
+            !ctx.state.inConditionals.length ||
+            ctx.state.inConditionals.every((cond) => cond.condition) ||
+            (line.lex.tokens && line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
 
-        ctx.afterState = checkConditionals ? this.evaluateLine(ctx.beforeState, line, ctx) : { ...ctx.beforeState }
+        if (checkConditionals) {
+            this.evaluateLine(ctx.state, line, ctx)
+        }
 
+        const lineNumber = line.getLineNumber()
         if (lineNumber < line.file.lines.length - 1) {
-            line.file.lines[lineNumber + 1].eval = new EvaluatorContext(ctx.options, line.file.lines[lineNumber + 1], ctx.afterState)
+            line.file.lines[lineNumber + 1].eval = new EvaluatorContext(ctx.options, line.file.lines[lineNumber + 1], ctx.state)
         }
 
         line.eval = ctx
@@ -3570,9 +3297,9 @@ export default class Evaluator {
         return ctx
     }
 
-    public evaluateLine(state: ILineState, line: LineContext, ctx: EvaluatorContext): ILineState {
+    public evaluateLine(state: ILineState, line: LineContext, ctx: EvaluatorContext): void {
         if (!line.parse || !line.parse.node || line.parse.node.children.length === 0) {
-            return state
+            return
         }
 
         const children = [...line.parse.node.children]
@@ -3595,7 +3322,7 @@ export default class Evaluator {
 
         if (op) {
             if (this.evalRules[op.type]) {
-                state = this.evalRules[op.type](state, op, label, ctx)
+                this.evalRules[op.type](state, op, label, ctx)
             } else {
                 if (NodeType[op.type] === TokenType[op.token.type]) {
                     this.error('No evaluator rule matches', op.token, ctx)
@@ -3604,10 +3331,10 @@ export default class Evaluator {
                 }
             }
         } else if (label) {
-            state = this.defineLabel(state, label, ctx)
+            this.defineLabel(state, label, ctx)
         }
 
-        return state
+        return
     }
 
     public calcConstExprOrHole(hole: ILinkHole, op: Node, expected: 'number', ctx: EvaluatorContext): number
@@ -3638,8 +3365,8 @@ export default class Evaluator {
         if (rule) {
             let val = rule(op, ctx)
             if (expected === 'number' && typeof val === 'string') {
-                if (ctx.beforeState && ctx.beforeState.charmaps && ctx.beforeState.charmaps.hasOwnProperty(val)) {
-                    val = ctx.beforeState.charmaps[val]
+                if (ctx.state && ctx.state.charmaps && ctx.state.charmaps.hasOwnProperty(val)) {
+                    val = ctx.state.charmaps[val]
                 } else if (val.length === 1) {
                     val = val.charCodeAt(0)
                 }
@@ -3660,9 +3387,9 @@ export default class Evaluator {
 
     public isConstExpr(op: Node, ctx: EvaluatorContext): boolean {
         if (op.type === NodeType.binary_operator && op.token.value === '-') {
-            if (ctx.beforeState.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
-                const left = ctx.beforeState.labels[op.children[0].token.value]
-                const right = ctx.beforeState.labels[op.children[1].token.value]
+            if (ctx.state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
+                const left = ctx.state.labels[op.children[0].token.value]
+                const right = ctx.state.labels[op.children[1].token.value]
                 if (left && right && left.section === right.section) {
                     return true
                 }
@@ -3671,15 +3398,15 @@ export default class Evaluator {
         if (op.type === NodeType.identifier) {
             switch (op.token.value) {
                 case '_NARG':
-                    if (ctx.beforeState.inMacroCalls && ctx.beforeState.inMacroCalls.length) {
+                    if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
                         return true
                     }
             }
-            if (ctx.beforeState.numberEquates && ctx.beforeState.numberEquates.hasOwnProperty(op.token.value)) {
+            if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(op.token.value)) {
                 return true
-            } else if (ctx.beforeState.stringEquates && ctx.beforeState.stringEquates.hasOwnProperty(op.token.value)) {
+            } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(op.token.value)) {
                 return true
-            } else if (ctx.beforeState.sets && ctx.beforeState.sets.hasOwnProperty(op.token.value)) {
+            } else if (ctx.state.sets && ctx.state.sets.hasOwnProperty(op.token.value)) {
                 return true
             }
             return false
@@ -3705,9 +3432,9 @@ export default class Evaluator {
         return 'number'
     }
 
-    public defineLabel(state: ILineState, label: Node, ctx: EvaluatorContext): ILineState {
+    public defineLabel(state: ILineState, label: Node, ctx: EvaluatorContext): void {
         const exported = label.token.value.endsWith('::')
-        const local = label.token.value.includes('.')
+        const local = label.token.value.indexOf('.') >= 0
         let labelId = label.token.value.replace(':', '').replace(':', '')
         if (local) {
             if (state.inLabel) {
@@ -3715,37 +3442,33 @@ export default class Evaluator {
                     labelId = state.inLabel + labelId
                 } else if (labelId.substr(0, labelId.indexOf('.')) !== state.inLabel) {
                     this.error('Local label defined within wrong global label', label.token, ctx)
-                    return state
+                    return
                 }
             } else {
                 this.error('Local label defined before any global labels', label.token, ctx)
-                return state
+                return
             }
         }
         if (state.labels && state.labels[labelId]) {
             this.error('Label already defined', label.token, ctx)
-            return state
+            return
         }
         if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
             this.error('Labels must be defined within a section', label.token, ctx)
-            return state
+            return
         }
         this.compiler.logger.log('defineSymbol', 'Define label', labelId)
-        return {
-            ...state,
-            labels: {
-                ...state.labels,
-                [labelId]: {
-                    id: labelId,
-                    line: state.line,
-                    file: ctx.line.file.getRoot().scope,
-                    section: state.inSections[0],
-                    byteOffset: state.sections[state.inSections[0]].bytes.length,
-                    exported: exported || ctx.options.exportAllLabels
-                }
-            },
-            inLabel: local ? state.inLabel : labelId
+
+        state.labels = state.labels ? state.labels : {}
+        state.labels[labelId] = {
+            id: labelId,
+            line: state.line,
+            file: ctx.line.file.getRoot().scope,
+            section: state.inSections[0],
+            byteOffset: state.sections[state.inSections[0]].bytes.length,
+            exported: exported || ctx.options.exportAllLabels
         }
+        state.inLabel = local ? state.inLabel : labelId
     }
 
     public applySourceReplace(source: string, regex: RegExp, value: string): string {

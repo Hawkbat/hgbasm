@@ -51,8 +51,14 @@ export default class Compiler {
 
         const compileDiags = ctx.diagnostics.slice()
 
-        ctx.link = this.linker.link(ctx, ctx.options.linker)
-        ctx.symbolData = ctx.link.symbolData
+        this.logger.log('compileInfo', 'Linking')
+        try {
+            ctx.link = this.linker.link(ctx, ctx.options.linker)
+            ctx.symbolData = ctx.link.symbolData
+        } catch (err) {
+            this.logger.log('compileCrash', `A fatal error occurred during linking.\n${err.stack}`)
+            this.stopped = true
+        }
 
         const linkDiags = ctx.diagnostics.filter((diag) => !compileDiags.includes(diag)).map((diag) => {
             diag.area = 'Linker'
@@ -64,10 +70,16 @@ export default class Compiler {
 
         this.logger.log('compileInfo', `Linking ${linkErrorCount ? 'failed' : 'finished'} with ${linkErrorCount} ${linkErrorCount === 1 ? 'error' : 'errors'} and ${linkWarnCount} ${linkWarnCount === 1 ? 'warning' : 'warnings'}`)
 
-        ctx.fix = this.fixer.fix(ctx, ctx.options.fixer)
-        ctx.romData = ctx.fix.romData
+        this.logger.log('compileInfo', 'Fixing ROM')
+        try {
+            ctx.fix = this.fixer.fix(ctx, ctx.options.fixer)
+            ctx.romData = ctx.fix.romData
+        } catch (err) {
+            this.logger.log('compileCrash', `A fatal error occurred during ROM fixing.\n${err.stack}`)
+            this.stopped = true
+        }
 
-        this.logger.log('compileInfo', `Fixing ${!ctx.fix.romData ? 'failed' : 'finished'}`)
+        this.logger.log('compileInfo', `Fixing ROM ${!ctx.fix || !ctx.fix.romData ? 'failed' : 'finished'}`)
 
         for (const diag of ctx.diagnostics.slice(0, 10)) {
             if (diag.type === 'error') {
@@ -100,7 +112,7 @@ export default class Compiler {
                     this.logger.log('lineNode', line.parse.node.toString())
                 }
                 if (line.eval) {
-                    this.logger.log('lineState', JSON.stringify(line.eval.afterState, null, 4))
+                    this.logger.log('lineState', JSON.stringify(line.eval.state, null, 4))
                 }
                 this.stopped = true
             }

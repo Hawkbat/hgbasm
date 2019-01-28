@@ -53,19 +53,19 @@ const levelArr: LogLevel[] = [
 ]
 
 const colorMap: { [key in LogType]: Ansi } = {
-    lineSource: Ansi.White,
+    lineSource: Ansi.Reset,
     defineSymbol: Ansi.Yellow,
     purgeSymbol: Ansi.Magenta,
     stringExpansion: Ansi.BrightBlack,
     linkHole: Ansi.BrightBlack,
-    linkSection: Ansi.White,
+    linkSection: Ansi.Reset,
     tokenStream: Ansi.BrightBlack,
     lineNode: Ansi.BrightBlack,
     lineState: Ansi.BrightBlack,
     diagnosticError: Ansi.Red,
     diagnosticWarn: Ansi.Yellow,
-    diagnosticInfo: Ansi.White,
-    compileInfo: Ansi.White,
+    diagnosticInfo: Ansi.Reset,
+    compileInfo: Ansi.Reset,
     compileCrash: Ansi.BrightRed
 }
 

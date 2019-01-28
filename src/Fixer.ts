@@ -38,7 +38,7 @@ export default class Fixer {
                     options.cgbCompatibility === 'both' ? 0x80 :
                         0x00
             data.set(options.licensee.padEnd(2, ' ').substr(0, 2).split('').map((c) => c.charCodeAt(0)), 0x0144)
-            data[0x0146] = options.sgbCompatible ? 0x30 : 0x00
+            data[0x0146] = options.sgbCompatible ? 0x03 : 0x00
             data[0x0147] = options.mbcType & 0xFF
             data[0x0148] = romSizePadFactor & 0xFF
             data[0x0149] = options.ramSize & 0xFF

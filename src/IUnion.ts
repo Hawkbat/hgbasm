@@ -1,5 +1,5 @@
 
 export default interface IUnion {
-    readonly byteOffset: number
-    readonly byteLength: number
+    byteOffset: number
+    byteLength: number
 }
