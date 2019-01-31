@@ -1,5 +1,8 @@
-# gbasm.js
+# hgbasm
 A JavaScript-based compiler for RGBDS GameBoy assembly syntax variants.
+
+If you're looking to use the compiler directly from the command line, see [hgbasm-cli](https://github.com/Hawkbat/hgbasm-cli).
+A Visual Studio Code plugin will also be available after future milestones are completed.
 
 Note that this project is not a perfect port of the RGBDS suite and is not guaranteed to accept every valid assembly file or generate binary-compatible output. However, issues related to compatibility will be addressed as they are reported, especially if there is no suitably trivial workaround available. Pull requests welcome.
 
@@ -8,16 +11,16 @@ Note that this project is not a perfect port of the RGBDS suite and is not guara
 - [X] Linker (RGBLINK equivalent)
 - [X] Fixer (RGBFIX equivalent)
 - [X] JS API (subject to change)
-- [ ] Command-line API for Node environments
+- [X] Command-line API for Node environments
 - [ ] Language Server Protocol implementation
 - [ ] Monaco web editor plugin
 - [ ] Visual Studio Code extension
 
 ## Installation
-An NPM package and Visual Studio Code plugin will be available after future milestones are completed.
+`npm install --save hgbasm`
 
 ## Usage
-For now, can only be used directly from the source. See `src/main.ts` for an example of configuring and invoking the compiler using Node.
+Proper documentation will be added once the API is stable. The source code of [hgbasm-cli](https://github.com/Hawkbat/hgbasm-cli) shows basic usage of each of the main compiler components.
 
 ## Contribution
 All feature requests, issues, and code contributions are welcome. Just clone the repo, make any changes to the TypeScript code in the `src/` directory, and submit a pull request.
