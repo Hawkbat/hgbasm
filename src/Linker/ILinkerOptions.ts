@@ -7,4 +7,5 @@ export default interface ILinkerOptions {
     generateSymbolFile: boolean
     generateMapFile: boolean
     linkerScript: string
+    overlay: Uint8Array | null
 }
