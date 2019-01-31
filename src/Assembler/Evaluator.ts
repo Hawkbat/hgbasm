@@ -732,6 +732,9 @@ export default class Evaluator {
                             matches = matches && child.type === NodeType.indexer && child.children[0].token.value === '+' && child.children[0].children[0].token.value.toLowerCase() === '$ff00' && child.children[0].children[1].token.value.toLowerCase() === 'c'
                             break
                         case '[$FF00+n8]': {
+                            if (op.token.value.toLowerCase() === 'ld' && !ctx.options.optimizeLd) {
+                                matches = false
+                            }
                             const val = child.type === NodeType.indexer && this.isExpr(child.children[0]) && this.isConstExpr(child.children[0], ctx) ? this.calcConstExpr(child.children[0], 'number', ctx) : -1
                             matches = matches && val >= 0xFF00 && val <= 0xFFFF
                             break
