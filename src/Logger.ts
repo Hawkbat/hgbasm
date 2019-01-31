@@ -102,7 +102,7 @@ export default class Logger {
     public log(type: LogType, ...msg: string[]): void {
         if (levelArr.indexOf(levelMap[type]) <= levelArr.indexOf(this.level)) {
             // tslint:disable-next-line: no-console
-            console.log(`${colorMap[type]}${msg.join(' ').replace(/\t/g, '    ').trimRight()}${Ansi.Reset}`)
+            console.log(`${colorMap[type]}${msg.join(' ').replace(/\t/g, '    ').trimEnd()}${Ansi.Reset}`)
         }
         this.logs.push({ type, msg: msg.join(' ') })
     }
