@@ -36,6 +36,7 @@ export default class CompilerContext {
                 disableVramBanks: false,
                 disableWramBanks: false,
                 generateSymbolFile: false,
+                generateMapFile: false,
                 linkerScript: '',
                 ...(options ? options.linker : {})
             },

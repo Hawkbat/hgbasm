@@ -197,7 +197,7 @@ export default class Linker {
         ctx.regionTypeMap = this.getRegionTypes(ctx)
         ctx.linkSections = []
 
-        const sections = this.getAllSections(ctx.regionTypeMap, ctx)
+        const sections = this.getAllSections(ctx)
         let totalBanks = 1
 
         if (ctx.options.linkerScript) {
@@ -260,6 +260,10 @@ export default class Linker {
 
         if (ctx.options.generateSymbolFile) {
             ctx.symbolFile = this.getSymbolFile(ctx)
+        }
+
+        if (ctx.options.generateMapFile) {
+            ctx.mapFile = this.getMapFile(ctx)
         }
 
         const data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
@@ -361,7 +365,7 @@ export default class Linker {
         }
     }
 
-    public getAllSections(regionTypes: IRegionTypeMap, ctx: LinkerContext): IObjectSection[] {
+    public getAllSections(ctx: LinkerContext): IObjectSection[] {
         let sections: IObjectSection[] = []
         for (const file of ctx.objectFiles) {
             for (const section of file.sections) {
@@ -371,7 +375,7 @@ export default class Linker {
         }
 
         sections = sections.filter((section) => {
-            const type = regionTypes[section.region]
+            const type = ctx.regionTypeMap[section.region]
             if (!type) {
                 this.error('Invalid memory region', section, ctx)
             } else if (section.bank >= 0 && type.banks === 1) {
@@ -431,11 +435,61 @@ export default class Linker {
                 }
                 const link = ctx.linkSections.find((l) => l.section === file.sections[symbol.sectionId])
                 if (link) {
-                    lines.push(`${this.hexString(link.bank, 2, true)}:${this.hexString(link.start + symbol.value, 4, true)} ${symbol.name}\r\n`)
+                    lines.push(`${this.hexString(link.bank, 2, true)}:${this.hexString(link.start + symbol.value, 4, true)} ${symbol.name}`)
                 }
             }
         }
         return lines.sort().join('\r\n')
+    }
+
+    public getMapFile(ctx: LinkerContext): string {
+        let result: string = ''
+        const regionList = [RegionType.rom0, RegionType.romx, RegionType.wram0, RegionType.wramx, RegionType.vram, RegionType.oam, RegionType.hram, RegionType.sram]
+        for (const region of regionList) {
+            const type = ctx.regionTypeMap[region]
+            if (!type) {
+                continue
+            }
+            let lastBank = type.banks - 1
+            if (region === RegionType.romx) {
+                lastBank = ctx.linkSections.map((l) => l.bank).reduce((p, c) => Math.max(p, c))
+            }
+            for (let bank = type.noBank0 ? 1 : 0; bank <= lastBank; bank++) {
+                if (region === RegionType.rom0) {
+                    result += `ROM Bank #${bank} (HOME):\r\n`
+                } else if (region === RegionType.romx) {
+                    result += `ROM Bank #${bank}:\r\n`
+                } else if (region === RegionType.wram0 || region === RegionType.wramx) {
+                    result += `WRAM Bank #${bank}:\r\n`
+                } else if (region === RegionType.vram) {
+                    result += `VRAM Bank #${bank}:\r\n`
+                } else if (region === RegionType.oam) {
+                    result += `OAM:\r\n`
+                } else if (region === RegionType.hram) {
+                    result += `HRAM:\r\n`
+                } else if (region === RegionType.sram) {
+                    result += `SRAM Bank #${bank}:\r\n`
+                }
+
+                const links = ctx.linkSections.filter((l) => l.region === region && l.bank === bank).sort((a, b) => a.start - b.start)
+                if (links.length > 0) {
+                    let size = type.end - type.start + 1
+                    for (const link of links) {
+                        result += `  SECTION: ${this.hexString(link.start)}-${this.hexString(link.end)} (${this.hexString(link.end - link.start + 1)} bytes) ["${link.section.name}"]\r\n`
+                        const symbols = link.file.symbols.filter((s) => link.section === link.file.sections[s.sectionId]).sort((a, b) => a.value - b.value)
+                        for (const symbol of symbols) {
+                            result += `           ${this.hexString(link.start + symbol.value)} = ${symbol.name}\r\n`
+                        }
+                        size -= (link.end - link.start + 1)
+                    }
+                    result += `    SLACK: ${this.hexString(size)} bytes\r\n`
+                } else {
+                    result += `  EMPTY\r\n`
+                }
+            }
+            result += '\r\n'
+        }
+        return result
     }
 
     public calcPatchValue(patch: IObjectPatch, link: ILinkSection, ctx: LinkerContext): number {
@@ -447,7 +501,7 @@ export default class Linker {
         }
 
         if (values.length !== 1) {
-            this.error(`Invalid link expression at ${patch.file}(${patch.line})`, link.section, ctx)
+            this.error(`Invalid link expression at ${patch.file} (${patch.line})`, link.section, ctx)
             return 0
         }
 
@@ -460,7 +514,7 @@ export default class Linker {
             return
         }
         const index = 0x4000 * link.bank + link.start - (link.region === RegionType.romx ? 0x4000 : 0x0000)
-        this.logger.log('linkPatch', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.data.length - 1, 5)} = ${link.section.name}`)
+        this.logger.log('linkPatch', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.data.length - 1, 5)} = ${link.section.name} `)
         bs.index = index
         bs.writeBytes(link.section.data)
     }
@@ -469,7 +523,7 @@ export default class Linker {
         const val = this.calcPatchValue(patch, link, ctx)
         const index = 0x4000 * link.bank + link.start - (link.region === RegionType.romx ? 0x4000 : 0x0000) + patch.offset
 
-        this.logger.log('linkPatch', `Filling ${this.hexString(index)} = ${this.hexString(val)}`)
+        this.logger.log('linkPatch', `Filling ${this.hexString(index)} = ${this.hexString(val)} `)
 
         bs.index = index
         if (patch.type === PatchType.byte) {
@@ -557,10 +611,10 @@ export default class Linker {
     }
 
     public error(msg: string, section: IObjectSection | undefined, ctx: LinkerContext): void {
-        ctx.diagnostics.push(new Diagnostic('Linker', `${msg}${section ? ` at section "${section.name}"` : ''}`, 'error'))
+        ctx.diagnostics.push(new Diagnostic('Linker', `${msg} ${section ? ` at section "${section.name}"` : ''} `, 'error'))
     }
 
     private hexString(n: number, len: number = 4, noSymbol: boolean = false): string {
-        return `${n < 0 ? '-' : ''}${noSymbol ? '' : '$'}${Math.abs(n).toString(16).toUpperCase().padStart(len, '0')}`
+        return `${n < 0 ? '-' : ''} ${noSymbol ? '' : '$'} ${Math.abs(n).toString(16).toUpperCase().padStart(len, '0')} `
     }
 }

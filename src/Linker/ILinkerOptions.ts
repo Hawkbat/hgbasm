@@ -5,5 +5,6 @@ export default interface ILinkerOptions {
     disableRomBanks: boolean
     disableVramBanks: boolean
     generateSymbolFile: boolean
+    generateMapFile: boolean
     linkerScript: string
 }

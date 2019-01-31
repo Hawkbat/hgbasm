@@ -14,6 +14,7 @@ export default class LinkerContext {
     public diagnostics: Diagnostic[] = []
     public romFile?: Uint8Array
     public symbolFile?: string
+    public mapFile?: string
 
     constructor(options: ILinkerOptions, objectFiles: IObjectFile[]) {
         this.options = options
