@@ -393,7 +393,7 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            const inc = await ctx.context.fileProvider.retrieve(this.calcConstExpr(op.children[0], 'string', ctx), false)
+            const inc = await ctx.context.fileProvider.retrieve(this.calcConstExpr(op.children[0], 'string', ctx), ctx.line.file.source, false)
             if (!inc) {
                 this.error('Could not find a matching file to include', op.token, ctx)
                 return
@@ -412,7 +412,7 @@ export default class Evaluator {
                 this.error('Cannot include binary data when not inside a section', op.token, ctx)
                 return
             }
-            const inc = await ctx.context.fileProvider.retrieve(this.calcConstExpr(op.children[0], 'string', ctx), true)
+            const inc = await ctx.context.fileProvider.retrieve(this.calcConstExpr(op.children[0], 'string', ctx), ctx.line.file.source, true)
             if (!inc) {
                 this.error('Could not find a matching file to include', op.token, ctx)
                 return
@@ -825,7 +825,7 @@ export default class Evaluator {
             const macro = state.macros[op.token.value]
             const startLine = macro.startLine + 1
             const endLine = macro.endLine - 1
-            const srcFile = await ctx.context.fileProvider.retrieve(macro.file, false)
+            const srcFile = await ctx.context.fileProvider.retrieve(macro.file, ctx.line.file.source, false)
             if (!srcFile) {
                 this.error('Macro exists in out-of-scope source file', op.token, ctx)
                 return

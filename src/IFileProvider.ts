@@ -1,5 +1,5 @@
 import AsmFile from './AsmFile'
 
 export default interface IFileProvider {
-    retrieve(path: string, binary: boolean): AsmFile | null | Promise<AsmFile | null>
+    retrieve(path: string, sender: AsmFile, binary: boolean): AsmFile | null | Promise<AsmFile | null>
 }
