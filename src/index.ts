@@ -1,8 +1,6 @@
 export { default as Assembler } from './Assembler/Assembler'
 export { default as AssemblerContext } from './Assembler/AssemblerContext'
 export { default as FileContext } from './Assembler/FileContext'
-export { default as Compiler } from './Compiler/Compiler'
-export { default as CompilerContext } from './Compiler/CompilerContext'
 export { default as Fixer } from './Fixer/Fixer'
 export { default as FixerContext } from './Fixer/FixerContext'
 export { default as Linker } from './Linker/Linker'
