@@ -1,5 +1,5 @@
 {
-  "name": "gbasm",
+  "name": "hgbasm",
   "version": "1.0.0",
   "description": "A JavaScript-based compiler for RGBDS GameBoy assembly syntax variants.",
   "main": "lib/index.js",
@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hawkbat/gbasm.js.git"
+    "url": "git+https://github.com/Hawkbat/hgbasm.git"
   },
   "author": "Joshua Thome",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Hawkbat/gbasm.js/issues"
+    "url": "https://github.com/Hawkbat/hgbasm/issues"
   },
-  "homepage": "https://github.com/Hawkbat/gbasm.js#readme",
+  "homepage": "https://github.com/Hawkbat/hgbasm#readme",
   "dependencies": {},
   "devDependencies": {
     "typescript": "^3.2.4"
