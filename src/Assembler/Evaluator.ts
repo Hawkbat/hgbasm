@@ -726,7 +726,7 @@ export default class Evaluator {
                             matches = matches && child.type === NodeType.indexer && this.isExpr(child.children[0])
                             break
                         case 'sp+e8':
-                            matches = matches && child.token.value === '+' && child.children[0].token.value.toLowerCase() === 'sp' && this.isExpr(child.children[1])
+                            matches = matches && (child.token.value === '+' || child.token.value === '-') && child.children[0].token.value.toLowerCase() === 'sp' && this.isExpr(child.children[1])
                             break
                         case '[$FF00+c]':
                             matches = matches && child.type === NodeType.indexer && child.children[0].token.value === '+' && child.children[0].children[0].token.value.toLowerCase() === '$ff00' && child.children[0].children[1].token.value.toLowerCase() === 'c'
@@ -780,7 +780,11 @@ export default class Evaluator {
                             }
                             case 'sp+e8': {
                                 const val: number = this.calcConstExprOrPatch(PatchType.byte, sectionLength + bytes.length, op.children[i].children[1], 'number', ctx)
-                                bytes.push(val & 0xFF)
+                                if (op.children[i].token.value === '-') {
+                                    bytes.push((-val + 0x100) & 0xFF)
+                                } else {
+                                    bytes.push(val & 0xFF)
+                                }
                                 break
                             }
                             case '[n8]': {
