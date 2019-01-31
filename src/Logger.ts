@@ -91,6 +91,14 @@ interface ILogMsg {
     msg: string
 }
 
+function trimEnd(str: string): string {
+    if (String.prototype.trimEnd) {
+        return str.trimEnd()
+    } else {
+        return str.replace(/\s+$/g, '')
+    }
+}
+
 export default class Logger {
     constructor(
         public level: LogLevel,
@@ -102,7 +110,7 @@ export default class Logger {
     public log(type: LogType, ...msg: string[]): void {
         if (levelArr.indexOf(levelMap[type]) <= levelArr.indexOf(this.level)) {
             // tslint:disable-next-line: no-console
-            console.log(`${colorMap[type]}${msg.join(' ').replace(/\t/g, '    ').trimEnd()}${Ansi.Reset}`)
+            console.log(`${colorMap[type]}${trimEnd(msg.join(' ').replace(/\t/g, '    '))}${Ansi.Reset}`)
         }
         this.logs.push({ type, msg: msg.join(' ') })
     }
