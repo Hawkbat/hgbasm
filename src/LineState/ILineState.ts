@@ -2,9 +2,12 @@ import IConditional from './IConditional'
 import ILabel from './ILabel'
 import IMacro from './IMacro'
 import IMacroCall from './IMacroCall'
+import INumberEquate from './INumberEquate'
 import IOptions from './IOptions'
 import IRepeat from './IRepeat'
 import ISection from './ISection'
+import ISet from './ISet'
+import IStringEquate from './IStringEquate'
 import IUnion from './IUnion'
 
 export default interface ILineState {
@@ -12,9 +15,9 @@ export default interface ILineState {
     line: number
     sections?: { [key: string]: ISection }
     labels?: { [key: string]: ILabel }
-    numberEquates?: { [key: string]: number }
-    stringEquates?: { [key: string]: string }
-    sets?: { [key: string]: number }
+    numberEquates?: { [key: string]: INumberEquate }
+    stringEquates?: { [key: string]: IStringEquate }
+    sets?: { [key: string]: ISet }
     macros?: { [key: string]: IMacro }
     charmaps?: { [key: string]: number }
     inSections?: string[]

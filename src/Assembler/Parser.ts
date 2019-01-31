@@ -1,7 +1,5 @@
-import Compiler from './Compiler'
-import Diagnostic from './Diagnostic'
-import IParserOptions from './IParserOptions'
-import LineContext from './LineContext'
+import Diagnostic from '../Diagnostic'
+import Logger from '../Logger'
 import Node from './Node'
 import NodeType from './NodeType'
 import ParserContext from './ParserContext'
@@ -12,6 +10,7 @@ type ParserPrefixRule = (token: Token, ctx: ParserContext) => Node
 type ParserInfixRule = (left: Node, token: Token, ctx: ParserContext) => Node
 
 export default class Parser {
+    public logger: Logger
 
     public prefixRules: { [key: number]: ParserPrefixRule } = {
         [TokenType.start_of_line]: (token, ctx) => {
@@ -211,30 +210,27 @@ export default class Parser {
         '-': 8
     }
 
-    constructor(public compiler: Compiler) {
-
+    constructor(logger: Logger) {
+        this.logger = logger
     }
 
-    public parse(line: LineContext, options: IParserOptions): ParserContext {
-        const ctx = new ParserContext(options, line)
-
-        if (line.lex) {
-            if (line.eval && line.eval.state) {
-                const checkMacro = line.eval.state.inMacro && !line.lex.tokens.some((t) => t.type === TokenType.keyword && t.value.toLowerCase() === 'endm')
-                const checkConditional = line.eval.state.inConditionals && line.eval.state.inConditionals.length && !line.eval.state.inConditionals.every((cond) => cond.condition) && !(line.lex.tokens && line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
-                if (checkMacro || checkConditional) {
-                    ctx.node = new Node(NodeType.comment, new Token(TokenType.comment, line.text, 0, 0), [])
-                    line.parse = ctx
-                    return ctx
-                }
+    public async parse(ctx: ParserContext): Promise<ParserContext> {
+        if (ctx.line.lex) {
+            const checkMacro = ctx.state.inMacro && !ctx.line.lex.tokens.some((t) => t.type === TokenType.keyword && t.value.toLowerCase() === 'endm')
+            const checkConditional = ctx.state.inConditionals && ctx.state.inConditionals.length && !ctx.state.inConditionals.every((cond) => cond.condition) && !(ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
+            if (checkMacro || checkConditional) {
+                ctx.node = new Node(NodeType.comment, new Token(TokenType.comment, ctx.line.text, 0, 0), [])
+                ctx.line.parse = ctx
+                return ctx
             }
-            ctx.tokens = line.lex.tokens.filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp).reverse()
+
+            ctx.tokens = ctx.line.lex.tokens.filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp).reverse()
             ctx.node = this.parseNode(0, ctx)
         } else {
             this.error('Line was parsed before lexing, aborting', undefined, ctx)
         }
 
-        line.parse = ctx
+        ctx.line.parse = ctx
 
         return ctx
     }
@@ -289,6 +285,6 @@ export default class Parser {
     }
 
     public error(msg: string, token: Token | undefined, ctx: ParserContext): void {
-        ctx.line.file.context.diagnostics.push(new Diagnostic('Parser', msg, 'error', token, ctx.line))
+        ctx.diagnostics.push(new Diagnostic('Parser', msg, 'error', token, ctx.line))
     }
 }

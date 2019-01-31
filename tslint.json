@@ -30,6 +30,9 @@
 				"parameter"
 			]
 		},
+		"no-non-null-assertion": {
+			"severity": "warn"
+		},
 		"object-literal-sort-keys": {
 			"severity": "off"
 		},

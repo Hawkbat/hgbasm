@@ -1,40 +1,34 @@
-import AsmFile from './AsmFile'
-import DeepPartial from './DeepPartial'
-import Diagnostic from './Diagnostic'
-import FileContext from './FileContext'
-import FixerContext from './FixerContext'
+import AsmFile from '../AsmFile'
+import AssemblerContext from '../Assembler/AssemblerContext'
+import DeepPartial from '../DeepPartial'
+import FixerContext from '../Fixer/FixerContext'
+import IFileProvider from '../IFileProvider'
+import LinkerContext from '../Linker/LinkerContext'
 import ICompilerOptions from './ICompilerOptions'
-import ILinkHole from './ILinkHole'
-import LinkerContext from './LinkerContext'
 
 export default class CompilerContext {
-    public files: FileContext[]
-    public includeFiles: AsmFile[]
+    public files: AsmFile[]
+    public fileProvider: IFileProvider
     public options: ICompilerOptions
-    public holes: ILinkHole[] = []
-    public diagnostics: Diagnostic[] = []
+    public assembles?: AssemblerContext[]
     public link?: LinkerContext
     public fix?: FixerContext
-    public romData?: Uint8Array
-    public symbolData?: string
+    public romFile?: Uint8Array
+    public symbolFile?: string
 
-    constructor(files: AsmFile[], includeFiles: AsmFile[], options?: DeepPartial<ICompilerOptions>) {
-        this.files = files.map((file) => new FileContext(this, null, file))
-        this.includeFiles = includeFiles
+    constructor(files: AsmFile[], fileProvider: IFileProvider, options?: DeepPartial<ICompilerOptions>) {
+        this.files = files
+        this.fileProvider = fileProvider
         this.options = {
-            lexer: {
-                ...(options ? options.lexer : {})
-            },
-            parser: {
-                ...(options ? options.parser : {})
-            },
-            evaluator: {
+            maxErrors: 15,
+            maxWarnings: 15,
+            assembler: {
                 padding: 0x00,
                 exportAllLabels: false,
                 nopAfterHalt: true,
                 debugDefineName: '',
                 debugDefineValue: '1',
-                ...(options ? options.evaluator : {})
+                ...(options ? options.assembler : {})
             },
             linker: {
                 padding: 0x00,

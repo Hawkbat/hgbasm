@@ -2,9 +2,10 @@
   "name": "gbasm",
   "version": "0.1.0",
   "description": "A JavaScript-based compiler for RGBDS GameBoy assembly syntax variants.",
-  "main": "out/main.js",
+  "main": "lib/main.js",
+  "types": "lib/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepare": "tsc"
   },
   "repository": {
     "type": "git",
@@ -18,8 +19,10 @@
   "homepage": "https://github.com/Hawkbat/gbasm.js#readme",
   "dependencies": {},
   "devDependencies": {
+    "@types/fs-extra": "^5.0.4",
     "@types/glob": "^7.1.1",
     "@types/node": "^10.12.18",
+    "fs-extra": "^7.0.1",
     "glob": "^7.1.3",
     "typescript": "^3.2.4"
   }

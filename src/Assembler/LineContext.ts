@@ -1,4 +1,4 @@
-import AsmLine from './AsmLine'
+import AsmLine from '../AsmLine'
 import EvaluatorContext from './EvaluatorContext'
 import FileContext from './FileContext'
 import LexerContext from './LexerContext'

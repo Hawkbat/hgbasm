@@ -1,13 +1,15 @@
 {
 	"compilerOptions": {
 		"rootDir": "./src/",
-		"outDir": "./out/",
+		"outDir": "./lib/",
 		"module": "commonjs",
 		"moduleResolution": "node",
-		"target": "esnext",
+		"target": "es5",
 		"lib": [
 			"esnext"
 		],
+		"downlevelIteration": true,
+		"declaration": true,
 		"strict": true,
 		"forceConsistentCasingInFileNames": true,
 		"noFallthroughCasesInSwitch": true,

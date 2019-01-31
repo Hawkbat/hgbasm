@@ -1,8 +1,6 @@
-import Compiler from './Compiler'
-import Diagnostic from './Diagnostic'
-import ILexerOptions from './ILexerOptions'
+import Diagnostic from '../Diagnostic'
+import Logger from '../Logger'
 import LexerContext from './LexerContext'
-import LineContext from './LineContext'
 import Token from './Token'
 import TokenType from './TokenType'
 
@@ -23,6 +21,7 @@ function getCachedRegExp(key: string, flags: string = 'g'): RegExp {
 }
 
 export default class Lexer {
+    public logger: Logger
 
     public rules: ILexerRule[] = [
         {
@@ -141,77 +140,73 @@ export default class Lexer {
         }
     ]
 
-    constructor(public compiler: Compiler) {
-
+    constructor(logger: Logger) {
+        this.logger = logger
     }
 
-    public lex(line: LineContext, options: ILexerOptions): LexerContext {
-        const ctx = new LexerContext(options, line)
-
-        let text = line.source.text
+    public async lex(ctx: LexerContext): Promise<LexerContext> {
+        let text = ctx.line.source.text
 
         text = this.applyAllReplacements(text, ctx)
 
-        line.text = text
+        ctx.line.text = text
 
-        if (line.text !== line.source.text) {
-            this.compiler.logger.log('stringExpansion', 'Before:', line.source.text)
-            this.compiler.logger.log('stringExpansion', 'After: ', line.text)
+        if (ctx.line.text !== ctx.line.source.text) {
+            this.logger.log('stringExpansion', 'Before:', ctx.line.source.text)
+            this.logger.log('stringExpansion', 'After: ', ctx.line.text)
         }
 
-        const tokens = this.lexString(text, line.getLineNumber())
+        const tokens = this.lexString(text, ctx.line.getLineNumber())
 
         ctx.tokens = tokens.map((token) => token.clone())
 
-        line.lex = ctx
+        ctx.line.lex = ctx
 
         return ctx
     }
 
     public applyAllReplacements(text: string, ctx: LexerContext): string {
-        if (ctx.line.eval && ctx.line.eval.state) {
-            let anyReplaced = true
-            while (anyReplaced) {
-                anyReplaced = false
-                if (ctx.line.eval.state.stringEquates && !getCachedRegExp('\\bpurge\\b', 'i').test(text) && !getCachedRegExp('\\bdef\\b', 'i').test(text)) {
-                    for (const key of Object.keys(ctx.line.eval.state.stringEquates)) {
-                        if (text.indexOf(key) === -1) {
-                            continue
-                        }
-                        const value = ctx.line.eval.state.stringEquates[key]
-                        const regex = getCachedRegExp(`(?<!\\.)\\{?\\b${key}\\b\\}?`)
-                        const newText = this.applyTextReplace(text, regex, value)
-                        if (text !== newText) {
-                            text = newText
-                            anyReplaced = true
-                        }
+        let anyReplaced = true
+        while (anyReplaced) {
+            anyReplaced = false
+            if (ctx.state.stringEquates && !getCachedRegExp('\\bpurge\\b', 'i').test(text) && !getCachedRegExp('\\bdef\\b', 'i').test(text)) {
+                for (const key of Object.keys(ctx.state.stringEquates)) {
+                    if (text.indexOf(key) === -1) {
+                        continue
+                    }
+                    const value = ctx.state.stringEquates[key].value
+                    const regex = getCachedRegExp(`(?<!\\.)\\{?\\b${key}\\b\\}?`)
+                    const newText = this.applyTextReplace(text, regex, value)
+                    if (text !== newText) {
+                        text = newText
+                        anyReplaced = true
                     }
                 }
-                if (ctx.line.eval.state.inMacroCalls && ctx.line.eval.state.inMacroCalls.length) {
-                    const macroCall = ctx.line.eval.state.inMacroCalls[0]
-                    for (let key = 1; key < 10; key++) {
-                        if (text.indexOf(`\\${key}`) === -1) {
-                            continue
-                        }
-                        const offset = key - 1 + macroCall.argOffset
-                        const value = macroCall.args[offset] ? macroCall.args[offset] : ''
-                        const regex = getCachedRegExp(`\\\\${key}`)
-                        const newText = this.applyTextReplace(text, regex, value)
-                        if (text !== newText) {
-                            text = newText
-                            anyReplaced = true
-                        }
+            }
+            if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
+                const macroCall = ctx.state.inMacroCalls[0]
+                for (let key = 1; key < 10; key++) {
+                    if (text.indexOf(`\\${key}`) === -1) {
+                        continue
+                    }
+                    const offset = key - 1 + macroCall.argOffset
+                    const value = macroCall.args[offset] ? macroCall.args[offset] : ''
+                    const regex = getCachedRegExp(`\\\\${key}`)
+                    const newText = this.applyTextReplace(text, regex, value)
+                    if (text !== newText) {
+                        text = newText
+                        anyReplaced = true
                     }
                 }
-                if (ctx.line.eval.state.macroCounter !== undefined) {
-                    if (text.indexOf('\\@') >= 0) {
-                        const value = `_${ctx.line.eval.state.macroCounter}`
-                        const regex = getCachedRegExp(`\\\\@`)
-                        const newText = this.applyTextReplace(text, regex, value)
-                        if (text !== newText) {
-                            text = newText
-                            anyReplaced = true
-                        }
+            }
+            if (ctx.state.macroCounter !== undefined) {
+                if (text.indexOf('\\@') >= 0) {
+                    const value = `_${ctx.state.macroCounter}`
+                    const regex = getCachedRegExp(`\\\\@`)
+                    const newText = this.applyTextReplace(text, regex, value)
+                    if (text !== newText) {
+                        text = newText
+                        anyReplaced = true
                     }
                 }
             }
@@ -300,6 +295,6 @@ export default class Lexer {
     }
 
     public error(msg: string, token: Token | undefined, ctx: LexerContext): void {
-        ctx.line.file.context.diagnostics.push(new Diagnostic('Lexer', msg, 'error', token, ctx.line))
+        ctx.diagnostics.push(new Diagnostic('Lexer', msg, 'error', token, ctx.line))
     }
 }

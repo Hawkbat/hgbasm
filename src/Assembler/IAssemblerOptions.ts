@@ -1,5 +1,5 @@
 
-export default interface IEvaluatorOptions {
+export default interface IAssemblerOptions {
     padding: number
     exportAllLabels: boolean
     nopAfterHalt: boolean
