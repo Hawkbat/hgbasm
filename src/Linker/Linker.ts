@@ -449,7 +449,7 @@ export default class Linker {
                 }
             }
         }
-        return lines.sort().join('\r\n')
+        return lines.sort().join('\n')
     }
 
     public getMapFile(ctx: LinkerContext): string {
@@ -466,38 +466,38 @@ export default class Linker {
             }
             for (let bank = type.noBank0 ? 1 : 0; bank <= lastBank; bank++) {
                 if (region === RegionType.rom0) {
-                    result += `ROM Bank #${bank} (HOME):\r\n`
+                    result += `ROM Bank #${bank} (HOME):\n`
                 } else if (region === RegionType.romx) {
-                    result += `ROM Bank #${bank}:\r\n`
+                    result += `ROM Bank #${bank}:\n`
                 } else if (region === RegionType.wram0 || region === RegionType.wramx) {
-                    result += `WRAM Bank #${bank}:\r\n`
+                    result += `WRAM Bank #${bank}:\n`
                 } else if (region === RegionType.vram) {
-                    result += `VRAM Bank #${bank}:\r\n`
+                    result += `VRAM Bank #${bank}:\n`
                 } else if (region === RegionType.oam) {
-                    result += `OAM:\r\n`
+                    result += `OAM:\n`
                 } else if (region === RegionType.hram) {
-                    result += `HRAM:\r\n`
+                    result += `HRAM:\n`
                 } else if (region === RegionType.sram) {
-                    result += `SRAM Bank #${bank}:\r\n`
+                    result += `SRAM Bank #${bank}:\n`
                 }
 
                 const links = ctx.linkSections.filter((l) => l.region === region && l.bank === bank).sort((a, b) => a.start - b.start)
                 if (links.length > 0) {
                     let size = type.end - type.start + 1
                     for (const link of links) {
-                        result += `  SECTION: ${this.hexString(link.start)}-${this.hexString(link.end)} (${this.hexString(link.end - link.start + 1)} bytes) ["${link.section.name}"]\r\n`
+                        result += `  SECTION: ${this.hexString(link.start)}-${this.hexString(link.end)} (${this.hexString(link.end - link.start + 1)} bytes) ["${link.section.name}"]\n`
                         const symbols = link.file.symbols.filter((s) => link.section === link.file.sections[s.sectionId]).sort((a, b) => a.value - b.value)
                         for (const symbol of symbols) {
-                            result += `           ${this.hexString(link.start + symbol.value)} = ${symbol.name}\r\n`
+                            result += `           ${this.hexString(link.start + symbol.value)} = ${symbol.name}\n`
                         }
                         size -= (link.end - link.start + 1)
                     }
-                    result += `    SLACK: ${this.hexString(size)} bytes\r\n`
+                    result += `    SLACK: ${this.hexString(size)} bytes\n`
                 } else {
-                    result += `  EMPTY\r\n`
+                    result += `  EMPTY\n`
                 }
             }
-            result += '\r\n'
+            result += '\n'
         }
         return result
     }
