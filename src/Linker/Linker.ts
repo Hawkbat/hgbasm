@@ -625,6 +625,6 @@ export default class Linker {
     }
 
     private hexString(n: number, len: number = 4, noSymbol: boolean = false): string {
-        return `${n < 0 ? '-' : ''} ${noSymbol ? '' : '$'} ${Math.abs(n).toString(16).toUpperCase().padStart(len, '0')} `
+        return `${n < 0 ? '-' : ''}${noSymbol ? '' : '$'}${Math.abs(n).toString(16).toUpperCase().padStart(len, '0')}`
     }
 }
