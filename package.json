@@ -1,6 +1,6 @@
 {
   "name": "hgbasm",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A JavaScript-based compiler for RGBDS GameBoy assembly syntax variants.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
