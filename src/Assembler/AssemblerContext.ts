@@ -12,6 +12,7 @@ export default class AssemblerContext {
     public file: FileContext
     public fileProvider: IFileProvider
     public objectFile: IObjectFile
+    public dependencies: string[] = []
     public patches: IPatch[] = []
     public diagnostics: Diagnostic[] = []
 
