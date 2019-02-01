@@ -14,7 +14,7 @@ import PatchType from './PatchType'
 import RegionType from './RegionType'
 import SymbolType from './SymbolType'
 
-type LinkExprRule = (values: number[], bs: BinarySerializer, link: ILinkSection, ctx: LinkerContext) => void
+type LinkExprRule = (values: number[], bs: BinarySerializer, patch: IObjectPatch, link: ILinkSection, ctx: LinkerContext) => void
 
 export default class Linker {
     public logger: Logger
@@ -123,8 +123,12 @@ export default class Linker {
             const a = values.pop() as number
             values.push(a >>> b)
         },
-        [ExprType.bank_id]: (values, bs, link, ctx) => {
+        [ExprType.bank_id]: (values, bs, patch, link, ctx) => {
             const symbol = link.file.symbols[bs.readLong()]
+            if (symbol.name === '@') {
+                values.push(link.start + patch.offset)
+                return
+            }
             const symLink = ctx.linkSections.find((l) => l.section === link.file.sections[symbol.sectionId])
             if (symLink) {
                 values.push(symLink.bank)
@@ -143,7 +147,7 @@ export default class Linker {
             }
             this.error(`Could not find a definition for symbol "${symbol.name}"`, link.section, ctx)
         },
-        [ExprType.bank_section]: (values, bs, link, ctx) => {
+        [ExprType.bank_section]: (values, bs, _, link, ctx) => {
             const sectionName = bs.readString()
             const otherLink = ctx.linkSections.find((l) => l.section.name === sectionName)
             if (otherLink) {
@@ -152,10 +156,10 @@ export default class Linker {
             }
             this.error(`Could not find a linked section named "${sectionName}"`, link.section, ctx)
         },
-        [ExprType.bank_current]: (values, _, link) => {
+        [ExprType.bank_current]: (values, _, __, link) => {
             values.push(link.bank)
         },
-        [ExprType.hram_check]: (values, _, link, ctx) => {
+        [ExprType.hram_check]: (values, _, __, link, ctx) => {
             const a = values.pop() as number
             if (a >= 0xFF00 && a <= 0xFFFF) {
                 values.push(a & 0xFF)
@@ -166,8 +170,12 @@ export default class Linker {
         [ExprType.immediate_int]: (values, bs) => {
             values.push(bs.readLong())
         },
-        [ExprType.immediate_id]: (values, bs, link, ctx) => {
+        [ExprType.immediate_id]: (values, bs, patch, link, ctx) => {
             const symbol = link.file.symbols[bs.readLong()]
+            if (symbol.name === '@') {
+                values.push(link.start + patch.offset)
+                return
+            }
             const symLink = ctx.linkSections.find((l) => l.section === link.file.sections[symbol.sectionId])
             if (symLink) {
                 values.push(symLink.start + symbol.value)
@@ -440,7 +448,7 @@ export default class Linker {
         const lines: string[] = []
         for (const file of ctx.objectFiles) {
             for (const symbol of file.symbols) {
-                if (symbol.type === SymbolType.Imported) {
+                if (symbol.type === SymbolType.Imported || symbol.name === '@') {
                     continue
                 }
                 const link = ctx.linkSections.find((l) => l.section === file.sections[symbol.sectionId])
@@ -488,6 +496,9 @@ export default class Linker {
                         result += `  SECTION: ${this.hexString(link.start)}-${this.hexString(link.end)} (${this.hexString(link.end - link.start + 1)} bytes) ["${link.section.name}"]\n`
                         const symbols = link.file.symbols.filter((s) => link.section === link.file.sections[s.sectionId]).sort((a, b) => a.value - b.value)
                         for (const symbol of symbols) {
+                            if (symbol.name === '@') {
+                                continue
+                            }
                             result += `           ${this.hexString(link.start + symbol.value)} = ${symbol.name}\n`
                         }
                         size -= (link.end - link.start + 1)
@@ -507,7 +518,7 @@ export default class Linker {
         const values: number[] = []
 
         while (!bs.reachedEnd()) {
-            this.exprRules[bs.readByte() as ExprType](values, bs, link, ctx)
+            this.exprRules[bs.readByte() as ExprType](values, bs, patch, link, ctx)
         }
 
         if (values.length !== 1) {
