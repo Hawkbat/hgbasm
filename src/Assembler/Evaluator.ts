@@ -398,7 +398,9 @@ export default class Evaluator {
                 this.error('Could not find a matching file to include', op.token, ctx)
                 return
             }
-            ctx.context.dependencies.push(inc.path)
+            if (ctx.context.dependencies.indexOf(inc.path) < 0) {
+                ctx.context.dependencies.push(inc.path)
+            }
             const file = new FileContext(inc, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}):${inc.path}`)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
         },
@@ -418,7 +420,9 @@ export default class Evaluator {
                 this.error('Could not find a matching file to include', op.token, ctx)
                 return
             }
-            ctx.context.dependencies.push(inc.path)
+            if (ctx.context.dependencies.indexOf(inc.path) < 0) {
+                ctx.context.dependencies.push(inc.path)
+            }
             const data = new Uint8Array(inc.buffer)
             const startOffset = op.children.length === 3 ? this.calcConstExpr(op.children[1], 'number', ctx) : 0
             const endOffset = op.children.length === 3 ? startOffset + this.calcConstExpr(op.children[2], 'number', ctx) : data.byteLength
@@ -833,7 +837,9 @@ export default class Evaluator {
                 return
             }
 
-            ctx.context.dependencies.push(srcFile.path)
+            if (ctx.context.dependencies.indexOf(srcFile.path) < 0) {
+                ctx.context.dependencies.push(srcFile.path)
+            }
 
             state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
             state.inMacroCalls.unshift({
