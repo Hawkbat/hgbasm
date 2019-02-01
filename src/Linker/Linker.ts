@@ -554,7 +554,7 @@ export default class Linker {
         } else if (patch.type === PatchType.long) {
             bs.writeLong(val)
         } else if (patch.type === PatchType.jr) {
-            bs.writeByte(val - (index - 1))
+            bs.writeByte(val - (index + 2 - 1))
         }
     }
 
