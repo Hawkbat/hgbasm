@@ -254,19 +254,6 @@ export default class Linker {
             }
         }
 
-        let data: Uint8Array
-
-        if (ctx.options.overlay) {
-            if (sections.some((s) => s.address < 0 || s.bank < 0)) {
-                this.error('All sections must have fixed addresses and banks if using an overlay ROM.', undefined, ctx)
-                return ctx
-            }
-            data = new Uint8Array(ctx.options.overlay)
-        } else {
-            data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
-            data.fill(ctx.options.padding)
-        }
-
         for (const section of sections) {
             const link = this.allocate(section, ctx)
             if (link) {
@@ -285,6 +272,19 @@ export default class Linker {
 
         if (ctx.options.generateMapFile) {
             ctx.mapFile = this.getMapFile(ctx)
+        }
+
+        let data: Uint8Array
+
+        if (ctx.options.overlay) {
+            if (sections.some((s) => s.address < 0 || s.bank < 0)) {
+                this.error('All sections must have fixed addresses and banks if using an overlay ROM.', undefined, ctx)
+                return ctx
+            }
+            data = new Uint8Array(ctx.options.overlay)
+        } else {
+            data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
+            data.fill(ctx.options.padding)
         }
 
         for (const link of ctx.linkSections) {
