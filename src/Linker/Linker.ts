@@ -496,8 +496,8 @@ export default class Linker {
                 } else {
                     result += `  EMPTY\n`
                 }
+                result += '\n'
             }
-            result += '\n'
         }
         return result
     }
