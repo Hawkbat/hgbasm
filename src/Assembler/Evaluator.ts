@@ -1689,6 +1689,11 @@ export default class Evaluator {
                     if (symbol) {
                         bs.writeByte(ExprType.immediate_id)
                         bs.writeLong(symbol.id)
+                        if (id === '@' && !/\bd[bwl]\b/i.test(ctx.line.text)) {
+                            bs.writeByte(ExprType.immediate_int)
+                            bs.writeLong(1)
+                            bs.writeByte(ExprType.subtract)
+                        }
                     } else {
                         const newSymbolId = ctx.context.objectFile.symbols.length
                         ctx.context.objectFile.symbols.push({
@@ -1702,7 +1707,7 @@ export default class Evaluator {
                         })
                         bs.writeByte(ExprType.immediate_id)
                         bs.writeLong(newSymbolId)
-                        if (id === '@' && /\bjr\b/i.test(ctx.line.text)) {
+                        if (id === '@' && !/\bd[bwl]\b/i.test(ctx.line.text)) {
                             bs.writeByte(ExprType.immediate_int)
                             bs.writeLong(1)
                             bs.writeByte(ExprType.subtract)

@@ -123,10 +123,10 @@ export default class Linker {
             const a = values.pop() as number
             values.push(a >>> b)
         },
-        [ExprType.bank_id]: (values, bs, patch, link, ctx) => {
+        [ExprType.bank_id]: (values, bs, _, link, ctx) => {
             const symbol = link.file.symbols[bs.readLong()]
             if (symbol.name === '@') {
-                values.push(link.start + patch.offset)
+                values.push(link.bank)
                 return
             }
             const symLink = ctx.linkSections.find((l) => l.section === link.file.sections[symbol.sectionId])
@@ -554,7 +554,7 @@ export default class Linker {
         } else if (patch.type === PatchType.long) {
             bs.writeLong(val)
         } else if (patch.type === PatchType.jr) {
-            bs.writeByte(val - index - 1)
+            bs.writeByte(val - (index - 1))
         }
     }
 
