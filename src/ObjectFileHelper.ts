@@ -24,7 +24,7 @@ export function writeObjectFile(obj: IObjectFile): Uint8Array {
     }
     for (const section of obj.sections) {
         s.writeString(section.name)
-        s.writeLong(section.data ? section.data.length : 0)
+        s.writeLong(section.size)
         s.writeByte(section.region)
         s.writeLong(section.address)
         s.writeLong(section.bank)
@@ -106,6 +106,7 @@ export function readObjectFile(path: string, bin: Uint8Array): IObjectFile {
         }
         sections.push({
             id,
+            size,
             name,
             region,
             address,

@@ -238,7 +238,7 @@ export default class Linker {
                             section.address = addrs[addrKey]
                             section.region = region
                             section.bank = bank
-                            addrs[addrKey] += section.data ? section.data.length : 0
+                            addrs[addrKey] += section.size
                         }
                     } else if (token.value.toLowerCase() === 'org') {
                         addrs[addrKey] = this.parseNumberToken(tokens.pop())
@@ -439,7 +439,7 @@ export default class Linker {
             } else if (!aHasAlign && bHasAlign) {
                 return 1
             }
-            return a.data.length - b.data.length
+            return a.size - b.size
         })
         return sections
     }
@@ -578,7 +578,7 @@ export default class Linker {
             return {
                 region,
                 start: addr,
-                end: addr + section.data.length - 1,
+                end: addr + section.size - 1,
                 bank,
                 section,
                 file
@@ -594,7 +594,7 @@ export default class Linker {
                     return false
                 }
                 const x0 = addr
-                const x1 = addr + section.data.length - 1
+                const x1 = addr + section.size - 1
                 const y0 = s.start
                 const y1 = s.end
                 return x1 >= y0 && y1 >= x0
@@ -606,7 +606,7 @@ export default class Linker {
                         addr += alignment - (addr % alignment)
                     }
                 }
-                if (addr + section.data.length - 1 > type.end || fixedAddr) {
+                if (addr + section.size - 1 > type.end || fixedAddr) {
                     if (bank >= type.banks - 1) {
                         this.error('Not enough room left in any bank', section, ctx)
                         return undefined
@@ -622,7 +622,7 @@ export default class Linker {
                 return {
                     region,
                     start: addr,
-                    end: addr + section.data.length - 1,
+                    end: addr + section.size - 1,
                     bank,
                     section,
                     file

@@ -109,11 +109,12 @@ export default class Assembler {
                 ctx.objectFile.sections.push({
                     id: ctx.objectFile.sections.length,
                     name: v.id,
+                    size: v.bytes.length,
                     region: RegionType[v.region as keyof typeof RegionType],
                     address: v.fixedAddress ? v.fixedAddress : -1,
                     bank: v.bank ? v.bank : -1,
                     align: v.alignment ? v.alignment : -1,
-                    data: v.bytes,
+                    data: v.region === 'rom0' || v.region === 'romx' ? v.bytes : [],
                     patches: ctx.patches.filter((p) => p.section === v.id).map((p) => ({
                         file: p.file,
                         line: p.line,
