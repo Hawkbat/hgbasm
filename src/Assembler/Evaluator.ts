@@ -1652,11 +1652,11 @@ export default class Evaluator {
                     }
                 } else if (op.children[0].token.value.toLowerCase() === 'high') {
                     bs.writeByte(ExprType.immediate_int)
-                    bs.writeLong(8)
-                    bs.writeByte(ExprType.immediate_int)
                     bs.writeLong(0xFF00)
                     this.buildLinkExpr(bs, op.children[1], ctx)
                     bs.writeByte(ExprType.bitwise_and)
+                    bs.writeByte(ExprType.immediate_int)
+                    bs.writeLong(8)
                     bs.writeByte(ExprType.shift_right)
                 } else if (op.children[0].token.value.toLowerCase() === 'low') {
                     bs.writeByte(ExprType.immediate_int)
