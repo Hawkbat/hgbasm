@@ -232,6 +232,8 @@ export default class Linker {
                             bank = this.parseNumberToken(tokens.pop())
                             addrKey = `${region}[${bank}]`
                             addrs[addrKey] = addrs[addrKey] ? addrs[addrKey] : regionType.start
+                        } else {
+                            this.error(`Invalid region type "${token.value}"`, undefined, ctx)
                         }
                     } else if (token.type === TokenType.string) {
                         const section = sections.find((s) => s.name === token.value.substr(1, token.value.length - 2))
@@ -240,6 +242,8 @@ export default class Linker {
                             section.region = region
                             section.bank = bank
                             addrs[addrKey] += section.size
+                        } else {
+                            this.error(`No matching section named "${token.value}" found`, undefined, ctx)
                         }
                     } else if (token.value.toLowerCase() === 'org') {
                         addrs[addrKey] = this.parseNumberToken(tokens.pop())
