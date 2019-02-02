@@ -8,6 +8,7 @@ import ExprType from './ExprType'
 import ILinkSection from './ILinkSection'
 import IObjectPatch from './IObjectPatch'
 import IObjectSection from './IObjectSection'
+import IObjectSymbol from './IObjectSymbol'
 import IRegionTypeMap from './IRegionTypeMap'
 import LinkerContext from './LinkerContext'
 import PatchType from './PatchType'
@@ -445,7 +446,7 @@ export default class Linker {
     }
 
     public getSymbolFile(ctx: LinkerContext): string {
-        const lines: string[] = []
+        const symbolMap: { [key: number]: { symbol: IObjectSymbol, link: ILinkSection } } = {}
         for (const file of ctx.objectFiles) {
             for (const symbol of file.symbols) {
                 if (symbol.type === SymbolType.Imported || symbol.name === '@') {
@@ -453,11 +454,11 @@ export default class Linker {
                 }
                 const link = ctx.linkSections.find((l) => l.section === file.sections[symbol.sectionId])
                 if (link) {
-                    lines.push(`${this.hexString(link.bank, 2, true)}:${this.hexString(link.start + symbol.value, 4, true)} ${symbol.name}`)
+                    symbolMap[link.start + symbol.value] = { symbol, link }
                 }
             }
         }
-        return lines.sort().join('\n')
+        return Object.values(symbolMap).map((s) => `${this.hexString(s.link.bank, 2, true)}:${this.hexString(s.link.start + s.symbol.value, 4, true)} ${s.symbol.name}`).sort().join('\n')
     }
 
     public getMapFile(ctx: LinkerContext): string {
