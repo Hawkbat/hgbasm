@@ -11,6 +11,9 @@ export default class EvaluatorContext {
     public state: ILineState
     public options: IAssemblerOptions
 
+    public inSection: string = ''
+    public inLabel: string = ''
+
     constructor(context: AssemblerContext, line: LineContext, diagnostics: Diagnostic[], state: ILineState) {
         this.context = context
         this.line = line

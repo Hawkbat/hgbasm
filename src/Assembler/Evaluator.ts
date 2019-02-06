@@ -1443,6 +1443,9 @@ export default class Evaluator {
             await this.evaluateLine(ctx.state, ctx.line, ctx)
         }
 
+        ctx.inSection = ctx.state.inSections && ctx.state.inSections.length ? ctx.state.inSections[0] : ''
+        ctx.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
+
         ctx.line.eval = ctx
 
         return ctx
@@ -1754,7 +1757,7 @@ export default class Evaluator {
         state.labels[labelId] = {
             id: labelId,
             line: state.line,
-            file: ctx.context.file.scope,
+            file: ctx.context.file.source.path,
             section: state.inSections[0],
             byteOffset: state.sections[state.inSections[0]].bytes.length,
             exported: exported || ctx.options.exportAllLabels
