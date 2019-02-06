@@ -16,6 +16,7 @@ import TokenType from './TokenType'
 
 type EvaluatorRule = (state: ILineState, op: Node, label: Node | null, ctx: EvaluatorContext) => void | Promise<void>
 type ConstExprRule = (op: Node, ctx: EvaluatorContext) => number | string
+type PredefineRule = (ctx: EvaluatorContext) => number | string
 
 const regexpCache: { [key: string]: RegExp } = {}
 
@@ -1262,6 +1263,19 @@ export default class Evaluator {
                 let anyReplaced = true
                 while (anyReplaced) {
                     anyReplaced = false
+                    for (const key of Object.keys(this.predefineRules)) {
+                        if (source.indexOf(key) === -1) {
+                            continue
+                        }
+                        const val = this.predefineRules[key](ctx)
+                        const value = typeof val === 'string' ? val : `$${val.toString(16).toUpperCase()}`
+                        const regex = getCachedRegExp(`\\{${key}\\}`)
+                        const newSource = this.applySourceReplace(source, regex, value)
+                        if (source !== newSource) {
+                            source = newSource
+                            anyReplaced = true
+                        }
+                    }
                     if (ctx.state.sets) {
                         for (const key of Object.keys(ctx.state.sets)) {
                             if (source.indexOf(key) === -1) {
@@ -1351,12 +1365,9 @@ export default class Evaluator {
         },
         [TokenType.identifier]: (op, ctx) => {
             const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
-            switch (id) {
-                case '_NARG':
-                    if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
-                        return ctx.state.inMacroCalls[0].args.length
+            if (this.predefineRules[id]) {
+                return this.predefineRules[id](ctx)
                     }
-            }
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
                 return ctx.state.numberEquates[id].value
             } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(id)) {
@@ -1389,6 +1400,57 @@ export default class Evaluator {
         [TokenType.octal_number]: (op) => {
             return parseInt(op.token.value.substr(1), 8)
         }
+    }
+
+    public predefineRules: { [key: string]: PredefineRule } = {
+        _PI: () => Math.round(Math.PI * 65536),
+        _RS: (ctx) => ctx.state.rsCounter ? ctx.state.rsCounter : 0,
+        _NARG: (ctx) => {
+            if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
+                return ctx.state.inMacroCalls[0].args.length
+            } else {
+                return 0
+            }
+        },
+        __LINE__: (ctx) => ctx.state.line,
+        __FILE__: (ctx) => ctx.state.file,
+        __DATE__: (ctx) => {
+            const date = ctx.context.startDateTime
+            const days = date.getDate().toString().padStart(2, '0')
+            const month = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][date.getMonth()]
+            const year = date.getFullYear()
+            return `${days} ${month} ${year}`
+        },
+        __TIME__: (ctx) => {
+            const date = ctx.context.startDateTime
+            const hours = date.getHours().toString().padStart(2, '0')
+            const minutes = date.getMinutes().toString().padStart(2, '0')
+            const seconds = date.getSeconds().toString().padStart(2, '0')
+            return `${hours}:${minutes}:${seconds}`
+        },
+        __ISO_8601_LOCAL__: (ctx) => {
+            const date = ctx.context.startDateTime
+            const pad = (n: number) => n < 10 ? `0${n}` : `${n}`
+            const tz = date.getTimezoneOffset()
+            let tzs = (tz > 0 ? '-' : '+') + pad(parseInt(`${Math.abs(tz / 60)}`, 10))
+            if (tz % 60 !== 0) {
+                tzs += pad(Math.abs(tz % 60))
+            }
+            if (tz === 0) {
+                tzs = 'Z'
+            }
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds()) + tzs}`
+        },
+        __ISO_8601_UTC__: (ctx) => `${ctx.context.startDateTime.toISOString()}`,
+        __UTC_YEAR__: (ctx) => `${ctx.context.startDateTime.getUTCFullYear()}`,
+        __UTC_MONTH__: (ctx) => `${ctx.context.startDateTime.getUTCMonth() + 1}`,
+        __UTC_DAY__: (ctx) => `${ctx.context.startDateTime.getUTCDay() + 1}`,
+        __UTC_HOUR__: (ctx) => `${ctx.context.startDateTime.getUTCHours()}`,
+        __UTC_MINUTE__: (ctx) => `${ctx.context.startDateTime.getUTCMinutes()}`,
+        __UTC_SECOND__: (ctx) => `${ctx.context.startDateTime.getUTCSeconds()}`,
+        __RGBDS_MAJOR__: () => 0,
+        __RGBDS_MINOR__: () => 3,
+        __RGBDS_PATCH__: () => 7
     }
 
     public linkExprBinaryRules: { [key: string]: ExprType } = {
@@ -1561,12 +1623,9 @@ export default class Evaluator {
             }
         }
         if (op.type === NodeType.identifier) {
-            switch (op.token.value) {
-                case '_NARG':
-                    if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
+            if (this.predefineRules[op.token.value]) {
                         return true
                     }
-            }
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(op.token.value)) {
                 return true
             } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(op.token.value)) {

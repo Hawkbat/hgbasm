@@ -12,6 +12,7 @@ export default class AssemblerContext {
     public file: FileContext
     public fileProvider: IFileProvider
     public objectFile: IObjectFile
+    public startDateTime: Date
     public dependencies: string[] = []
     public patches: IPatch[] = []
     public diagnostics: Diagnostic[] = []
@@ -22,5 +23,6 @@ export default class AssemblerContext {
         this.file = file
         this.fileProvider = fileProvider
         this.objectFile = { path: file.source.path, symbols: [], sections: [] }
+        this.startDateTime = new Date()
     }
 }
