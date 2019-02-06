@@ -192,7 +192,7 @@ export default class Evaluator {
             const endLine = lineNumber - 1
 
             for (let i = 1; i < count; i++) {
-                const file = new FileContext(ctx.line.file.source, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}):rept`, startLine, endLine)
+                const file = new FileContext(ctx.line.file.source, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}) -> rept`, startLine, endLine)
                 await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
             }
             state.inRepeats.shift()
@@ -401,7 +401,7 @@ export default class Evaluator {
             if (ctx.context.dependencies.indexOf(inc.path) < 0) {
                 ctx.context.dependencies.push(inc.path)
             }
-            const file = new FileContext(inc, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}):${inc.path}`)
+            const file = new FileContext(inc, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}) -> ${inc.path}`)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
         },
         incbin: async (state, op, label, ctx) => {
@@ -849,7 +849,7 @@ export default class Evaluator {
             })
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
 
-            const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}):${srcFile.path}`, startLine, endLine)
+            const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}) -> ${macro.id}`, startLine, endLine)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
 
             state.inMacroCalls.shift()

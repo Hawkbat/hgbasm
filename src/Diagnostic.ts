@@ -14,21 +14,22 @@ export default class Diagnostic {
     }
     public toString(): string {
         let msg = ''
-        if (this.line) {
-            msg += `${this.line.file.scope}(${this.line.lineNumber + 1},${this.token ? this.token.col : '0'}): `
-        }
         if (this.type === 'error') {
-            msg += `${this.area} error: ${this.msg}`
+            msg += `ERROR: `
         } else if (this.type === 'warn') {
-            msg += `${this.area} warning: ${this.msg}`
+            msg += `warning: `
         } else if (this.type === 'info') {
-            msg += `${this.msg}`
+            msg += `info: `
+        }
+        if (this.line) {
+            msg += `${this.line.file.scope}(${this.line.lineNumber + 1}): `
         }
         if (this.token) {
             msg += ` at ${TokenType[this.token.type]} ${JSON.stringify(this.token.value)}`
         }
-        if (this.line && (this.type === 'error' || this.type === 'warn')) {
-            if (this.token) {
+        msg += `${this.msg}`
+        if (this.line) {
+            if (this.token && (this.type === 'error' || this.type === 'warn')) {
                 const src = this.line.text
                 const whitespace = src.substr(0, this.token.col).replace(/[^\t]/g, ' ')
                 msg += `\n${src}\n${whitespace}${'^'.repeat(this.token.value.length)}`
