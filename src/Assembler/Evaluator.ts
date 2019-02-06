@@ -136,7 +136,7 @@ export default class Evaluator {
         },
         macro: (state, op, label, ctx) => {
             const labelId = label ? label.token.value.replace(/:/g, '') : ''
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (state.macros && state.macros[labelId]) {
                 this.error('Cannot redefine macros', op.token, ctx)
                 return
@@ -151,7 +151,7 @@ export default class Evaluator {
             state.inMacro = labelId
         },
         endm: (state, op, _, ctx) => {
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (!state.inMacro || !state.macros) {
                 this.error('No macro definition found to terminate', op.token, ctx)
                 return
@@ -167,7 +167,7 @@ export default class Evaluator {
             state.inMacroCalls[0].argOffset++
         },
         rept: (state, op, _, ctx) => {
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
@@ -182,7 +182,7 @@ export default class Evaluator {
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
         },
         endr: async (state, op, _, ctx) => {
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (!state.inRepeats || !state.inRepeats.length) {
                 this.error('No matching rept to terminate', op.token, ctx)
                 return
@@ -385,7 +385,7 @@ export default class Evaluator {
             }
         },
         include: async (state, op, label, ctx) => {
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (label) {
                 this.defineLabel(state, label, ctx)
             }
@@ -490,7 +490,7 @@ export default class Evaluator {
             }
         },
         section: (state, op, _, ctx) => {
-            const lineNumber = ctx.line.getLineNumber()
+            const lineNumber = ctx.line.lineNumber
             if (op.children.length === 0) {
                 this.error('Sections must be given a name', op.token, ctx)
                 return
@@ -849,7 +849,7 @@ export default class Evaluator {
             })
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
 
-            const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.getLineNumber() + 1}):${srcFile.path}`, startLine, endLine)
+            const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}):${srcFile.path}`, startLine, endLine)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
 
             state.inMacroCalls.shift()

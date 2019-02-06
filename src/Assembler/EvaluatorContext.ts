@@ -16,7 +16,7 @@ export default class EvaluatorContext {
         this.line = line
         this.diagnostics = diagnostics
         this.state = state ? state : { line: 0, file: '' }
-        this.state.line = line.getLineNumber()
+        this.state.line = line.lineNumber
         this.state.file = line.file.source.path
         this.options = context.options
     }

@@ -156,7 +156,7 @@ export default class Lexer {
             this.logger.log('stringExpansion', 'After: ', ctx.line.text)
         }
 
-        const tokens = this.lexString(text, ctx.line.getLineNumber())
+        const tokens = this.lexString(text, ctx.line.lineNumber)
 
         ctx.tokens = tokens.map((token) => token.clone())
 

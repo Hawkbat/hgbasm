@@ -6,6 +6,7 @@ import ParserContext from './ParserContext'
 
 export default class LineContext {
     public file: FileContext
+    public lineNumber: number
     public source: AsmLine
     public text: string
 
@@ -17,9 +18,6 @@ export default class LineContext {
         this.file = file
         this.source = line
         this.text = line.text
-    }
-
-    public getLineNumber(): number {
-        return this.file.lines.indexOf(this)
+        this.lineNumber = line.file.lines.indexOf(line)
     }
 }

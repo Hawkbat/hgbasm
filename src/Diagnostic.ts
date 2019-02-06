@@ -15,7 +15,7 @@ export default class Diagnostic {
     public toString(): string {
         let msg = ''
         if (this.line) {
-            msg += `${this.line.file.scope}(${this.line.getLineNumber() + 1},${this.token ? this.token.col : '0'}): `
+            msg += `${this.line.file.scope}(${this.line.lineNumber + 1},${this.token ? this.token.col : '0'}): `
         }
         if (this.type === 'error') {
             msg += `${this.area} error: ${this.msg}`
