@@ -1,3 +1,4 @@
+import ILogPipe from './ILogPipe'
 
 enum Ansi {
     Black = '\u001b[30m',
@@ -39,7 +40,7 @@ enum Ansi {
 }
 
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'all'
-export type LogType = 'lineSource' | 'defineSymbol' | 'purgeSymbol' | 'stringExpansion' | 'linkPatch' | 'linkSection' | 'tokenStream' | 'lineNode' | 'lineState' | 'diagnosticError' | 'diagnosticWarn' | 'diagnosticInfo' | 'compileInfo' | 'compileCrash'
+export type LogType = 'lineSource' | 'defineSymbol' | 'purgeSymbol' | 'stringExpansion' | 'linkPatch' | 'linkSection' | 'tokenStream' | 'lineNode' | 'lineState' | 'error' | 'warn' | 'info' | 'fatal'
 
 const levelArr: LogLevel[] = [
     'off',
@@ -62,11 +63,10 @@ const colorMap: { [key in LogType]: Ansi } = {
     tokenStream: Ansi.BrightBlack,
     lineNode: Ansi.BrightBlack,
     lineState: Ansi.BrightBlack,
-    diagnosticError: Ansi.Red,
-    diagnosticWarn: Ansi.Yellow,
-    diagnosticInfo: Ansi.Reset,
-    compileInfo: Ansi.Reset,
-    compileCrash: Ansi.BrightRed
+    error: Ansi.Red,
+    warn: Ansi.Yellow,
+    info: Ansi.Reset,
+    fatal: Ansi.BrightRed
 }
 
 const levelMap: { [key in LogType]: LogLevel } = {
@@ -79,39 +79,27 @@ const levelMap: { [key in LogType]: LogLevel } = {
     tokenStream: 'debug',
     lineNode: 'debug',
     lineState: 'debug',
-    diagnosticError: 'error',
-    diagnosticWarn: 'warn',
-    diagnosticInfo: 'info',
-    compileInfo: 'info',
-    compileCrash: 'fatal'
-}
-
-interface ILogMsg {
-    type: LogType
-    msg: string
-}
-
-function trimEnd(str: string): string {
-    if (String.prototype.trimEnd) {
-        return str.trimEnd()
-    } else {
-        return str.replace(/\s+$/g, '')
-    }
+    error: 'error',
+    warn: 'warn',
+    info: 'info',
+    fatal: 'fatal'
 }
 
 export default class Logger {
     constructor(
-        public level: LogLevel,
-        public logs: ILogMsg[] = []
+        public pipe: ILogPipe,
+        public level: LogLevel = 'info'
     ) {
 
     }
 
     public log(type: LogType, ...msg: string[]): void {
         if (levelArr.indexOf(levelMap[type]) <= levelArr.indexOf(this.level)) {
-            // tslint:disable-next-line: no-console
-            console.log(`${colorMap[type]}${trimEnd(msg.join(' ').replace(/\t/g, '    '))}${Ansi.Reset}`)
+            let text = msg.join(' ').replace(/\t/g, '    ')
+            if (this.pipe.allowAnsi) {
+                text = `${colorMap[type]}${text}${Ansi.Reset}`
+            }
+            this.pipe.log(text, type)
         }
-        this.logs.push({ type, msg: msg.join(' ') })
     }
 }

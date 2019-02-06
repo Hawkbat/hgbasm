@@ -591,28 +591,28 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.info(this.calcConstExpr(op.children[0], 'string', ctx), undefined, ctx)
+            this.logger.log('info', this.calcConstExpr(op.children[0], 'string', ctx))
         },
         printv: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.info(`$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`, undefined, ctx)
+            this.logger.log('info', `$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`)
         },
         printi: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.info(`${this.calcConstExpr(op.children[0], 'number', ctx)}`, undefined, ctx)
+            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx)}`)
         },
         printf: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.info(`${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, undefined, ctx)
+            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`)
         }
     }
 
@@ -1367,7 +1367,7 @@ export default class Evaluator {
             const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
             if (this.predefineRules[id]) {
                 return this.predefineRules[id](ctx)
-                    }
+            }
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
                 return ctx.state.numberEquates[id].value
             } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(id)) {
@@ -1624,8 +1624,8 @@ export default class Evaluator {
         }
         if (op.type === NodeType.identifier) {
             if (this.predefineRules[op.token.value]) {
-                        return true
-                    }
+                return true
+            }
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(op.token.value)) {
                 return true
             } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(op.token.value)) {
@@ -1845,9 +1845,5 @@ export default class Evaluator {
 
     public warn(msg: string, token: Token | undefined, ctx: EvaluatorContext): void {
         ctx.diagnostics.push(new Diagnostic('Evaluator', msg, 'warn', token, ctx.line))
-    }
-
-    public info(msg: string, token: Token | undefined, ctx: EvaluatorContext): void {
-        ctx.diagnostics.push(new Diagnostic('Evaluator', msg, 'info', token, ctx.line))
     }
 }

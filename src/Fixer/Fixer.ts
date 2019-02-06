@@ -10,7 +10,7 @@ export default class Fixer {
 
     public async fix(ctx: FixerContext): Promise<FixerContext> {
         if (!ctx.romFile) {
-            this.logger.log('diagnosticError', 'Fixer error: File was fixed before linking, aborting')
+            this.logger.log('error', 'Fixer error: File was fixed before linking, aborting')
             return ctx
         }
 
