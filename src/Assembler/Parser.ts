@@ -216,7 +216,7 @@ export default class Parser {
 
     public async parse(ctx: ParserContext): Promise<ParserContext> {
         if (ctx.line.lex) {
-            const checkMacro = ctx.state.inMacro && !ctx.line.lex.tokens.some((t) => t.type === TokenType.keyword && t.value.toLowerCase() === 'endm')
+            const checkMacro = ctx.state.inMacroDefines && ctx.state.inMacroDefines.length && !ctx.line.lex.tokens.some((t) => t.type === TokenType.keyword && (t.value.toLowerCase() === 'macro' || t.value.toLowerCase() === 'endm'))
             const checkConditional = ctx.state.inConditionals && ctx.state.inConditionals.length && !ctx.state.inConditionals.every((cond) => cond.condition) && !(ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
             if (checkMacro || checkConditional) {
                 ctx.node = new Node(NodeType.comment, new Token(TokenType.comment, ctx.line.text, 0, 0), [])

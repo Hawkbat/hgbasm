@@ -142,24 +142,30 @@ export default class Evaluator {
                 this.error('Cannot redefine macros', op.token, ctx)
                 return
             }
-            state.macros = state.macros ? state.macros : {}
-            state.macros[labelId] = {
+            state.inMacroDefines = state.inMacroDefines ? state.inMacroDefines : []
+            state.inMacroDefines.unshift({
                 id: labelId,
                 file: state.file,
-                startLine: lineNumber,
-                endLine: -1
-            }
-            state.inMacro = labelId
-            this.logger.log('defineSymbol', 'Define macro', labelId, '\n')
+                line: lineNumber
+            })
         },
         endm: (state, op, _, ctx) => {
             const lineNumber = ctx.line.lineNumber
-            if (!state.inMacro || !state.macros) {
+            if (!state.inMacroDefines || !state.inMacroDefines.length) {
                 this.error('No macro definition found to terminate', op.token, ctx)
                 return
             }
-            state.macros[state.inMacro].endLine = lineNumber
-            delete state.inMacro
+            const define = state.inMacroDefines[0]
+            state.macros = state.macros ? state.macros : {}
+            state.macros[define.id] = {
+                id: define.id,
+                file: define.file,
+                startLine: define.line,
+                endLine: lineNumber
+            }
+
+            this.logger.log('defineSymbol', 'Define macro', define.id, '\n')
+            state.inMacroDefines.shift()
         },
         shift: (state, op, _, ctx) => {
             if (!state.inMacroCalls) {

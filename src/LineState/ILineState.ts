@@ -2,6 +2,7 @@ import IConditional from './IConditional'
 import ILabel from './ILabel'
 import IMacro from './IMacro'
 import IMacroCall from './IMacroCall'
+import IMacroDefine from './IMacroDefine'
 import INumberEquate from './INumberEquate'
 import IOptions from './IOptions'
 import IRepeat from './IRepeat'
@@ -25,9 +26,9 @@ export default interface ILineState {
     inRepeats?: IRepeat[]
     inConditionals?: IConditional[]
     inMacroCalls?: IMacroCall[]
+    inMacroDefines?: IMacroDefine[]
     options?: IOptions[]
     rsCounter?: number
     macroCounter?: number
     inLabel?: string
-    inMacro?: string
 }
