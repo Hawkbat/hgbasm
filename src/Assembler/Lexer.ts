@@ -152,8 +152,8 @@ export default class Lexer {
         ctx.line.text = text
 
         if (ctx.line.text !== ctx.line.source.text) {
-            this.logger.log('stringExpansion', 'Before:', ctx.line.source.text)
-            this.logger.log('stringExpansion', 'After: ', ctx.line.text)
+            this.logger.log('stringExpansion', 'Before:', ctx.line.source.text, '\n')
+            this.logger.log('stringExpansion', 'After: ', ctx.line.text, '\n')
         }
 
         const tokens = this.lexString(text, ctx.line.lineNumber)
