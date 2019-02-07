@@ -24,10 +24,10 @@ export default class Diagnostic {
         if (this.line) {
             msg += `${this.line.file.scope}(${this.line.lineNumber + 1}): `
         }
+        msg += `${this.msg}`
         if (this.token) {
             msg += ` at ${TokenType[this.token.type]} ${JSON.stringify(this.token.value)}`
         }
-        msg += `${this.msg}`
         if (this.line) {
             if (this.token && (this.type === 'error' || this.type === 'warn')) {
                 const src = this.line.text

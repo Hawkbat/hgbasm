@@ -50,7 +50,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'number', ctx)
             }
-            this.logger.log('defineSymbol', 'Define number equate', labelId, 'as', state.numberEquates[labelId].toString())
+            this.logger.log('defineSymbol', 'Define number equate', labelId, 'as', state.numberEquates[labelId].toString(), '\n')
         },
         equs: (state, op, label, ctx) => {
             const labelId = label ? label.token.value.replace(/:/g, '') : ''
@@ -74,7 +74,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'string', ctx)
             }
-            this.logger.log('defineSymbol', 'Define string equate', labelId, 'as', state.stringEquates[labelId].value)
+            this.logger.log('defineSymbol', 'Define string equate', labelId, 'as', state.stringEquates[labelId].value, '\n')
         },
         set: (state, op, label, ctx) => {
             const labelId = label ? label.token.value.replace(/:/g, '') : ''
@@ -90,7 +90,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'number', ctx)
             }
-            this.logger.log('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString())
+            this.logger.log('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString(), '\n')
         },
         charmap: (state, op, _, ctx) => {
             if (op.children.length !== 2) {
@@ -150,6 +150,7 @@ export default class Evaluator {
                 endLine: -1
             }
             state.inMacro = labelId
+            this.logger.log('defineSymbol', 'Define macro', labelId, '\n')
         },
         endm: (state, op, _, ctx) => {
             const lineNumber = ctx.line.lineNumber
@@ -180,11 +181,19 @@ export default class Evaluator {
                 line: lineNumber,
                 file: state.file
             })
+
+            state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
+            state.inMacroCalls.unshift({
+                id: 'rept',
+                args: state.inMacroCalls.length ? state.inMacroCalls[0].args : [],
+                argOffset: 0
+            })
+
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
         },
         endr: async (state, op, _, ctx) => {
             const lineNumber = ctx.line.lineNumber
-            if (!state.inRepeats || !state.inRepeats.length) {
+            if (!state.inRepeats || !state.inRepeats.length || !state.inMacroCalls || !state.inMacroCalls.length) {
                 this.error('No matching rept to terminate', op.token, ctx)
                 return
             }
@@ -197,6 +206,7 @@ export default class Evaluator {
                 await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
             }
             state.inRepeats.shift()
+            state.inMacroCalls.shift()
         },
         union: (state, op, _, ctx) => {
             if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {
@@ -254,7 +264,7 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)).toString())
+            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx)).toString(), '\n')
             state.sets = state.sets ? state.sets : {}
             state.sets[labelId] = {
                 id: labelId,
@@ -271,7 +281,7 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2).toString())
+            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 2).toString(), '\n')
             state.sets = state.sets ? state.sets : {}
             state.sets[labelId] = {
                 id: labelId,
@@ -288,7 +298,7 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4).toString())
+            this.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + this.calcConstExpr(op.children[0], 'number', ctx) * 4).toString(), '\n')
             state.sets = state.sets ? state.sets : {}
             state.sets[labelId] = {
                 id: labelId,
@@ -467,22 +477,22 @@ export default class Evaluator {
                 let purged = false
                 if (state.stringEquates && state.stringEquates[id]) {
                     delete state.stringEquates[id]
-                    this.logger.log('purgeSymbol', 'Purge string equate', id)
+                    this.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
                     purged = true
                 }
                 if (state.numberEquates && state.numberEquates[id]) {
                     delete state.numberEquates[id]
-                    this.logger.log('purgeSymbol', 'Purge string equate', id)
+                    this.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
                     purged = true
                 }
                 if (state.sets && state.sets[id]) {
                     delete state.sets[id]
-                    this.logger.log('purgeSymbol', 'Purge string equate', id)
+                    this.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
                     purged = true
                 }
                 if (state.macros && state.macros[id]) {
                     delete state.macros[id]
-                    this.logger.log('purgeSymbol', 'Purge string equate', id)
+                    this.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
                     purged = true
                 }
                 if (!purged) {
@@ -591,28 +601,28 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('info', this.calcConstExpr(op.children[0], 'string', ctx))
+            this.logger.log('info', this.calcConstExpr(op.children[0], 'string', ctx), '\n')
         },
         printv: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('info', `$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`)
+            this.logger.log('info', `$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`, '\n')
         },
         printi: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx)}`)
+            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx)}`, '\n')
         },
         printf: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`)
+            this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, '\n')
         }
     }
 
@@ -1348,7 +1358,7 @@ export default class Evaluator {
                 }
             }
             if (source !== op.token.value) {
-                this.logger.log('stringExpansion', 'String expansion of', op.token.value, 'to', source)
+                this.logger.log('stringExpansion', 'String expansion of', op.token.value, 'to', source, '\n')
             }
             return source
         },
@@ -1810,7 +1820,7 @@ export default class Evaluator {
             this.error('Labels must be defined within a section', label.token, ctx)
             return
         }
-        this.logger.log('defineSymbol', 'Define label', labelId)
+        this.logger.log('defineSymbol', 'Define label', labelId, '\n')
 
         state.labels = state.labels ? state.labels : {}
         state.labels[labelId] = {
