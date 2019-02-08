@@ -46,7 +46,7 @@ export default class Parser {
                             const argNodes = args.map((arg) => {
                                 arg = arg.trim()
                                 lastIndex = source.indexOf(arg, lastIndex)
-                                return new Node(NodeType.string, new Token(TokenType.string, `"arg"`, token.line, token.col + token.value.length + lastIndex), [])
+                                return new Node(NodeType.string, new Token(TokenType.string, `"${arg}"`, token.line, token.col + token.value.length + lastIndex), [])
                             })
                             right.children.push(...argNodes)
                         }
