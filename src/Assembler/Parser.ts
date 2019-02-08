@@ -36,10 +36,9 @@ export default class Parser {
                     if (right.type === NodeType.identifier) {
                         right.type = NodeType.macro_call
 
-                        let source = ctx.line.text.substr(right.token.col + right.token.value.length + 1)
-                        if (source.indexOf(';') >= 0) {
-                            source = source.substr(0, source.indexOf(';'))
-                        }
+                        const argResult = (/^(?:(?:[^\s]*\s+)?[^\s]+)(.*?)(?:;.*|$)/g).exec(ctx.line.source.text)
+                        const source = argResult ? argResult[1] : ''
+
                         if (source.trim() !== '') {
                             const args = source.split(/\s*?(?<!\\),\s*?/g)
 

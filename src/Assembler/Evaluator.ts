@@ -861,7 +861,7 @@ export default class Evaluator {
             state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
             state.inMacroCalls.unshift({
                 id: op.token.value,
-                args: op.children.map((n) => n.token.value),
+                args: op.children.map((n) => this.calcConstExpr(n, 'string', ctx)),
                 argOffset: 0
             })
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
