@@ -40,7 +40,7 @@ enum Ansi {
 }
 
 export type LogLevel = 'off' | 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'all'
-export type LogType = 'lineSource' | 'defineSymbol' | 'purgeSymbol' | 'stringExpansion' | 'linkPatch' | 'linkSection' | 'tokenStream' | 'lineNode' | 'lineState' | 'error' | 'warn' | 'info' | 'fatal'
+export type LogType = 'lineSource' | 'defineSymbol' | 'purgeSymbol' | 'stringExpansion' | 'enterScope' | 'exitScope' | 'linkPatch' | 'linkSection' | 'tokenStream' | 'lineNode' | 'lineState' | 'error' | 'warn' | 'info' | 'fatal'
 
 const levelArr: LogLevel[] = [
     'off',
@@ -58,6 +58,8 @@ const colorMap: { [key in LogType]: Ansi } = {
     defineSymbol: Ansi.Yellow,
     purgeSymbol: Ansi.Magenta,
     stringExpansion: Ansi.BrightBlack,
+    enterScope: Ansi.Green,
+    exitScope: Ansi.Cyan,
     linkPatch: Ansi.BrightBlack,
     linkSection: Ansi.Reset,
     tokenStream: Ansi.BrightBlack,
@@ -74,6 +76,8 @@ const levelMap: { [key in LogType]: LogLevel } = {
     defineSymbol: 'trace',
     purgeSymbol: 'trace',
     stringExpansion: 'trace',
+    enterScope: 'trace',
+    exitScope: 'trace',
     linkPatch: 'trace',
     linkSection: 'debug',
     tokenStream: 'debug',

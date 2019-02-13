@@ -211,15 +211,17 @@ export default class Linker {
 
         if (ctx.options.linkerScript) {
             const lines = ctx.options.linkerScript.split(/\r?\n/g)
-            let lineNumber = 0
+            // let lineNumber = 0
 
             const addrs: { [key: string]: number } = {}
             let region = RegionType.rom0
             let bank = 0
             let addrKey = ''
 
-            for (const line of lines) {
-                const tokens = this.lexer.lexString(line, lineNumber++).filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp && t.type !== TokenType.comment && t.type !== TokenType.start_of_line && t.type !== TokenType.end_of_line).reverse()
+            for (const _ of lines) {
+                // TODO: fix Linker to not rely on Lexer; instead use simple Regex matcher
+                // const tokens = this.lexer.lexString(line, lineNumber++).filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp && t.type !== TokenType.semicolon_comment && t.type !== TokenType.start_of_line && t.type !== TokenType.end_of_line).reverse()
+                const tokens: Token[] = []
                 while (tokens.length) {
                     const token = tokens.pop()
                     if (!token) {

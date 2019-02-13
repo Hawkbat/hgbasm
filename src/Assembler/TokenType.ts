@@ -1,11 +1,13 @@
 
 enum TokenType {
     start_of_line,
-    comment,
+    semicolon_comment,
+    asterisk_comment,
     string,
-    escape,
+    string_escape,
     macro_escape,
-    interp,
+    macro_argument,
+    string_interpolation,
     space,
     operator,
     keyword,
@@ -15,7 +17,6 @@ enum TokenType {
     register,
     condition,
     macro_call,
-    label,
     identifier,
     fixed_point_number,
     decimal_number,
@@ -30,6 +31,7 @@ enum TokenType {
     open_paren,
     close_paren,
     unknown,
+    replaced,
     end_of_line
 }
 

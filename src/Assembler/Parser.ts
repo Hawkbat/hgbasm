@@ -19,7 +19,13 @@ export default class Parser {
                 return new Node(NodeType.line, token, [])
             } else {
                 const children: Node[] = []
-                if (this.peekToken(TokenType.label, ctx)) {
+                if (this.peekToken(TokenType.identifier, ctx)) {
+                    const right = this.parseNode(99, ctx)
+                    right.type = NodeType.label
+                    children.push(right)
+                }
+                const opToken = this.peekToken(TokenType.operator, ctx)
+                if (opToken && children.length && opToken.value === '=') {
                     const right = this.parseNode(99, ctx)
                     children.push(right)
                 }
@@ -30,34 +36,7 @@ export default class Parser {
                         kwToken.type = TokenType.opcode
                     }
                 }
-                if (!this.peekToken(TokenType.comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
-                    const right = this.parseNode(99, ctx)
-
-                    if (right.type === NodeType.identifier) {
-                        right.type = NodeType.macro_call
-
-                        const argResult = (/^(?:(?:[^\s]*\s+)?[^\s]+)(.*?)(?:;.*|$)/g).exec(ctx.line.source.text)
-                        const source = argResult ? argResult[1] : ''
-
-                        if (source.trim() !== '') {
-                            const args = source.split(/\s*?(?<!\\),\s*?/g)
-
-                            let lastIndex = 0
-                            const argNodes = args.map((arg) => {
-                                arg = arg.trim()
-                                lastIndex = source.indexOf(arg, lastIndex)
-                                return new Node(NodeType.string, new Token(TokenType.string, `"${arg}"`, token.line, token.col + token.value.length + lastIndex), [])
-                            })
-                            right.children.push(...argNodes)
-                        }
-
-                        while (!this.peekToken(TokenType.comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
-                            this.consumeToken(null, ctx)
-                        }
-                    }
-                    children.push(right)
-                }
-                if (this.peekToken(TokenType.comment, ctx)) {
+                while (this.peekToken(null, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
                     const right = this.parseNode(99, ctx)
                     children.push(right)
                 }
@@ -65,7 +44,10 @@ export default class Parser {
                 return new Node(NodeType.line, token, children)
             }
         },
-        [TokenType.comment]: (token) => {
+        [TokenType.semicolon_comment]: (token) => {
+            return new Node(NodeType.comment, token, [])
+        },
+        [TokenType.asterisk_comment]: (token) => {
             return new Node(NodeType.comment, token, [])
         },
         [TokenType.string]: (token) => {
@@ -77,7 +59,7 @@ export default class Parser {
         },
         [TokenType.keyword]: (token, ctx) => {
             const children: Node[] = []
-            if (!this.peekToken(TokenType.comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
+            if (!this.peekToken(TokenType.semicolon_comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
                 let right = this.parseNode(0, ctx)
                 children.push(right)
                 while (this.peekToken(TokenType.comma, ctx)) {
@@ -96,7 +78,7 @@ export default class Parser {
         },
         [TokenType.opcode]: (token, ctx) => {
             const children: Node[] = []
-            if (!this.peekToken(TokenType.comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
+            if (!this.peekToken(TokenType.semicolon_comment, ctx) && !this.peekToken(TokenType.end_of_line, ctx)) {
                 let right = this.parseNode(0, ctx)
                 children.push(right)
                 while (this.peekToken(TokenType.comma, ctx)) {
@@ -107,14 +89,28 @@ export default class Parser {
             }
             return new Node(NodeType.opcode, token, children)
         },
+        [TokenType.macro_call]: (token, ctx) => {
+            const children: Node[] = []
+            if (this.peekToken(TokenType.macro_argument, ctx)) {
+                let right = this.parseNode(0, ctx)
+                children.push(right)
+                while (this.peekToken(TokenType.comma, ctx)) {
+                    this.consumeToken(TokenType.comma, ctx)
+                    right = this.parseNode(0, ctx)
+                    children.push(right)
+                }
+            }
+            return new Node(NodeType.macro_call, token, children)
+
+        },
+        [TokenType.macro_argument]: (token) => {
+            return new Node(NodeType.string, token, [])
+        },
         [TokenType.register]: (token) => {
             return new Node(NodeType.register, token, [])
         },
         [TokenType.condition]: (token) => {
             return new Node(NodeType.condition, token, [])
-        },
-        [TokenType.label]: (token) => {
-            return new Node(NodeType.label, token, [])
         },
         [TokenType.identifier]: (token) => {
             return new Node(NodeType.identifier, token, [])
@@ -215,15 +211,34 @@ export default class Parser {
 
     public async parse(ctx: ParserContext): Promise<ParserContext> {
         if (ctx.line.lex) {
-            const checkMacro = ctx.state.inMacroDefines && ctx.state.inMacroDefines.length && !ctx.line.lex.tokens.some((t) => t.type === TokenType.keyword && (t.value.toLowerCase() === 'macro' || t.value.toLowerCase() === 'endm'))
-            const checkConditional = ctx.state.inConditionals && ctx.state.inConditionals.length && !ctx.state.inConditionals.every((cond) => cond.condition) && !(ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
+            const checkMacro =
+                ctx.state.inMacroDefines &&
+                ctx.state.inMacroDefines.length &&
+                !ctx.line.lex.tokens.some((t) =>
+                    t.type === TokenType.keyword &&
+                    (t.value.toLowerCase() === 'macro' ||
+                        t.value.toLowerCase() === 'endm'))
+            const checkConditional =
+                ctx.state.inConditionals &&
+                ctx.state.inConditionals.length &&
+                !ctx.state.inConditionals.every((cond) => cond.condition) &&
+                !(ctx.line.lex.tokens &&
+                    ctx.line.lex.tokens.some((t) =>
+                        t.value.toLowerCase() === 'if' ||
+                        t.value.toLowerCase() === 'elif' ||
+                        t.value.toLowerCase() === 'else' ||
+                        t.value.toLowerCase() === 'endc'))
             if (checkMacro || checkConditional) {
-                ctx.node = new Node(NodeType.comment, new Token(TokenType.comment, ctx.line.text, 0, 0), [])
+                ctx.node = new Node(NodeType.comment, new Token(TokenType.semicolon_comment, ctx.line.text, 0, 0), [])
                 ctx.line.parse = ctx
                 return ctx
             }
 
-            ctx.tokens = ctx.line.lex.tokens.filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp).reverse()
+            ctx.tokens = ctx.line.lex.tokens.filter((t) =>
+                t.type !== TokenType.space &&
+                t.type !== TokenType.string_escape &&
+                t.type !== TokenType.macro_escape &&
+                t.type !== TokenType.string_interpolation).reverse()
             ctx.node = this.parseNode(0, ctx)
         } else {
             this.error('Line was parsed before lexing, aborting', undefined, ctx)

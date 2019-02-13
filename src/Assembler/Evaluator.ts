@@ -156,16 +156,16 @@ export default class Evaluator {
                 return
             }
             if (state.inMacroDefines.length === 1) {
-            const define = state.inMacroDefines[0]
-            state.macros = state.macros ? state.macros : {}
-            state.macros[define.id] = {
-                id: define.id,
-                file: define.file,
-                startLine: define.line,
-                endLine: lineNumber
-            }
+                const define = state.inMacroDefines[0]
+                state.macros = state.macros ? state.macros : {}
+                state.macros[define.id] = {
+                    id: define.id,
+                    file: define.file,
+                    startLine: define.line,
+                    endLine: lineNumber
+                }
 
-            this.logger.log('defineSymbol', 'Define macro', define.id, '\n')
+                this.logger.log('defineSymbol', 'Define macro', define.id, '\n')
             }
             state.inMacroDefines.shift()
         },
@@ -1272,7 +1272,10 @@ export default class Evaluator {
         [NodeType.string]: (op, ctx) => {
             let source = op.token.value
 
-            if (source.startsWith('"') && source.endsWith('"')) {
+            if (op.token.type === TokenType.macro_argument) {
+                source = source.trim()
+            }
+            if (op.token.type === TokenType.string && source.startsWith('"') && source.endsWith('"')) {
                 source = source.substring(1, source.length - 1)
             }
             if (source.indexOf('\\') >= 0 || source.indexOf('{') >= 0) {
@@ -1408,24 +1411,24 @@ export default class Evaluator {
         [NodeType.number_literal]: (op, ctx) => {
             switch (op.token.type) {
                 case TokenType.fixed_point_number: {
-            const bits = op.token.value.split('.')
-            const high = parseInt(bits[0], 10)
-            const low = parseInt(bits[1], 10)
-            return (high << 16) | low
+                    const bits = op.token.value.split('.')
+                    const high = parseInt(bits[0], 10)
+                    const low = parseInt(bits[1], 10)
+                    return (high << 16) | low
                 }
                 case TokenType.decimal_number: {
-            return parseInt(op.token.value, 10)
+                    return parseInt(op.token.value, 10)
                 }
                 case TokenType.hex_number: {
-            return parseInt(op.token.value.substr(1), 16)
+                    return parseInt(op.token.value.substr(1), 16)
                 }
                 case TokenType.binary_number: {
-            return parseInt(op.token.value.substr(1), 2)
+                    return parseInt(op.token.value.substr(1), 2)
                 }
                 case TokenType.octal_number: {
-            return parseInt(op.token.value.substr(1), 8)
-        }
-    }
+                    return parseInt(op.token.value.substr(1), 8)
+                }
+            }
             this.error('Invalid number format', op.token, ctx)
             return 0
         }
