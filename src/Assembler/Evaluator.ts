@@ -155,6 +155,7 @@ export default class Evaluator {
                 this.error('No macro definition found to terminate', op.token, ctx)
                 return
             }
+            if (state.inMacroDefines.length === 1) {
             const define = state.inMacroDefines[0]
             state.macros = state.macros ? state.macros : {}
             state.macros[define.id] = {
@@ -165,6 +166,7 @@ export default class Evaluator {
             }
 
             this.logger.log('defineSymbol', 'Define macro', define.id, '\n')
+            }
             state.inMacroDefines.shift()
         },
         shift: (state, op, _, ctx) => {
@@ -858,10 +860,12 @@ export default class Evaluator {
                 ctx.context.dependencies.push(srcFile.path)
             }
 
+            const args = op.children.map((n) => this.calcConstExpr(n, 'string', ctx))
+
             state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
             state.inMacroCalls.unshift({
                 id: op.token.value,
-                args: op.children.map((n) => this.calcConstExpr(n, 'string', ctx)),
+                args,
                 argOffset: 0
             })
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
