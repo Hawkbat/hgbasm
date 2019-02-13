@@ -503,13 +503,26 @@ export default class Linker {
 
         bs.index = index
         if (patch.type === PatchType.byte) {
+            if (val < 0x00 || val > 0xFF) {
+                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 8 bits`, link.section, ctx)
+            }
             bs.writeByte(val)
         } else if (patch.type === PatchType.word) {
+            if (val < 0x0000 || val > 0xFFFF) {
+                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 16 bits`, link.section, ctx)
+            }
             bs.writeShort(val)
         } else if (patch.type === PatchType.long) {
+            if (val < 0x00000000 || val > 0xFFFFFFFF) {
+                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 32 bits`, link.section, ctx)
+            }
             bs.writeLong(val)
         } else if (patch.type === PatchType.jr) {
-            bs.writeByte(val - (index + 2 - 1))
+            const result = val - (index + 2 - 1)
+            if (result < -0x80 || result > 0x7F) {
+                this.error(`Calculated jump offset at ${patch.file}(${patch.line}) does not fit in 8 bits; try using JP instead`, link.section, ctx)
+            }
+            bs.writeByte(result)
         }
     }
 
