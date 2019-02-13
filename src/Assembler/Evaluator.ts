@@ -1269,7 +1269,7 @@ export default class Evaluator {
                 return 0
             }
         },
-        [TokenType.string]: (op, ctx) => {
+        [NodeType.string]: (op, ctx) => {
             let source = op.token.value
 
             if (source.startsWith('"') && source.endsWith('"')) {
@@ -1375,7 +1375,7 @@ export default class Evaluator {
             }
             return source
         },
-        [TokenType.open_paren]: (op, ctx) => {
+        [NodeType.function_call]: (op, ctx) => {
             const rule = this.functionRules[op.children[0].token.value.toLowerCase()]
             if (!rule) {
                 this.error('Unknown function name', op.children[0].token, ctx)
@@ -1383,10 +1383,10 @@ export default class Evaluator {
             }
             return rule(op, ctx)
         },
-        [TokenType.open_bracket]: (op, ctx) => {
+        [NodeType.indexer]: (op, ctx) => {
             return this.calcConstExpr(op.children[0], 'number', ctx)
         },
-        [TokenType.identifier]: (op, ctx) => {
+        [NodeType.identifier]: (op, ctx) => {
             const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
             if (this.predefineRules[id]) {
                 return this.predefineRules[id](ctx)
@@ -1405,23 +1405,29 @@ export default class Evaluator {
                 return 0
             }
         },
-        [TokenType.fixed_point_number]: (op) => {
+        [NodeType.number_literal]: (op, ctx) => {
+            switch (op.token.type) {
+                case TokenType.fixed_point_number: {
             const bits = op.token.value.split('.')
             const high = parseInt(bits[0], 10)
             const low = parseInt(bits[1], 10)
             return (high << 16) | low
-        },
-        [TokenType.decimal_number]: (op) => {
+                }
+                case TokenType.decimal_number: {
             return parseInt(op.token.value, 10)
-        },
-        [TokenType.hex_number]: (op) => {
+                }
+                case TokenType.hex_number: {
             return parseInt(op.token.value.substr(1), 16)
-        },
-        [TokenType.binary_number]: (op) => {
+                }
+                case TokenType.binary_number: {
             return parseInt(op.token.value.substr(1), 2)
-        },
-        [TokenType.octal_number]: (op) => {
+                }
+                case TokenType.octal_number: {
             return parseInt(op.token.value.substr(1), 8)
+        }
+    }
+            this.error('Invalid number format', op.token, ctx)
+            return 0
         }
     }
 
@@ -1608,7 +1614,7 @@ export default class Evaluator {
     public calcConstExpr(op: Node, expected: 'either', ctx: EvaluatorContext): number | string
     public calcConstExpr(op: Node, expected: 'number' | 'string' | 'either', ctx: EvaluatorContext): number | string {
         const defaultValue = (expected === 'string') ? '' : 0
-        let rule = this.constExprRules[op.token.type]
+        let rule = this.constExprRules[op.type]
         if (!rule) {
             rule = this.constExprRules[op.token.value.toLowerCase()]
         }
@@ -1632,7 +1638,7 @@ export default class Evaluator {
     }
 
     public isExpr(op: Node): boolean {
-        return !!this.constExprRules[op.token.type] || !!this.constExprRules[op.token.value.toLowerCase()]
+        return !!this.constExprRules[op.type] || !!this.constExprRules[op.token.value.toLowerCase()]
     }
 
     public isConstExpr(op: Node, ctx: EvaluatorContext): boolean {
