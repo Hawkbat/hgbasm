@@ -865,9 +865,12 @@ export default class Evaluator {
                 argOffset: 0
             })
             state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
+            this.logger.log('enterScope', 'Enter macro call', op.token.value, args.join(', '), '\n')
 
             const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}) -> ${macro.id}`, startLine, endLine)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
+
+            this.logger.log('exitScope', 'Exit macro call', op.token.value, '\n')
 
             state.inMacroCalls.shift()
         }
