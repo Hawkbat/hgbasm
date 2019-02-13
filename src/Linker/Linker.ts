@@ -1,6 +1,3 @@
-import Lexer from '../Assembler/Lexer'
-import Token from '../Assembler/Token'
-import TokenType from '../Assembler/TokenType'
 import BinarySerializer from '../BinarySerializer'
 import Diagnostic from '../Diagnostic'
 import Logger from '../Logger'
@@ -19,7 +16,6 @@ type LinkExprRule = (values: number[], bs: BinarySerializer, patch: IObjectPatch
 
 export default class Linker {
     public logger: Logger
-    public lexer: Lexer
 
     public exprRules: { [key in ExprType]: LinkExprRule } = {
         [ExprType.add]: (values) => {
@@ -199,7 +195,6 @@ export default class Linker {
 
     constructor(logger: Logger) {
         this.logger = logger
-        this.lexer = new Lexer(this.logger)
     }
 
     public async link(ctx: LinkerContext): Promise<LinkerContext> {
@@ -211,50 +206,87 @@ export default class Linker {
 
         if (ctx.options.linkerScript) {
             const lines = ctx.options.linkerScript.split(/\r?\n/g)
-            // let lineNumber = 0
 
             const addrs: { [key: string]: number } = {}
             let region = RegionType.rom0
             let bank = 0
             let addrKey = ''
 
-            for (const _ of lines) {
-                // TODO: fix Linker to not rely on Lexer; instead use simple Regex matcher
-                // const tokens = this.lexer.lexString(line, lineNumber++).filter((t) => t.type !== TokenType.space && t.type !== TokenType.escape && t.type !== TokenType.interp && t.type !== TokenType.semicolon_comment && t.type !== TokenType.start_of_line && t.type !== TokenType.end_of_line).reverse()
-                const tokens: Token[] = []
-                while (tokens.length) {
-                    const token = tokens.pop()
-                    if (!token) {
+            for (const line of lines) {
+                const bits = []
+                let next = ''
+                let inString = false
+                for (const c of line) {
+                    if (inString) {
+                        if (c === '"') {
+                            inString = false
+                            next += c
+                            if (next) {
+                                bits.push(next)
+                            }
+                            next = ''
+                        } else {
+                            next += c
+                        }
+                    } else {
+                        if (!inString && c === '"') {
+                            if (next) {
+                                bits.push(next)
+                            }
+                            next = c
+                            inString = true
+                        } else if (c === ';') {
+                            break
+                        } else if (c.trim()) {
+                            next += c
+                        } else {
+                            if (next) {
+                                bits.push(next)
+                            }
+                            next = ''
+                        }
+                    }
+                }
+                if (next) {
+                    bits.push(next)
+                }
+
+                bits.reverse()
+
+                while (bits.length) {
+                    let bit = bits.pop()
+                    if (!bit) {
                         break
                     }
-                    if (token.type === TokenType.region) {
-                        region = RegionType[token.value.toLowerCase() as keyof typeof RegionType]
+                    if (RegionType[bit.toLowerCase() as keyof typeof RegionType]) {
+                        region = RegionType[bit.toLowerCase() as keyof typeof RegionType]
                         const regionType = ctx.regionTypeMap[region]
                         if (regionType) {
-                            bank = this.parseNumberToken(tokens.pop())
+                            bank = this.parseNumber(bits.pop())
                             addrKey = `${region}[${bank}]`
                             addrs[addrKey] = addrs[addrKey] ? addrs[addrKey] : regionType.start
                         } else {
-                            this.error(`Invalid region type "${token.value}"`, undefined, ctx)
+                            this.error(`Invalid region type "${bit}"`, undefined, ctx)
                         }
-                    } else if (token.type === TokenType.string) {
-                        const section = sections.find((s) => s.name === token.value.substr(1, token.value.length - 2))
+                    } else if (bit.startsWith('"')) {
+                        bit = bit.substr(1, bit.length - 2)
+                        const section = sections.find((s) => s.name === bit)
                         if (section) {
                             section.address = addrs[addrKey]
                             section.region = region
                             section.bank = bank
                             addrs[addrKey] += section.size
                         } else {
-                            this.error(`No matching section named "${token.value}" found`, undefined, ctx)
+                            this.error(`No matching section named "${bit}" found`, undefined, ctx)
                         }
-                    } else if (token.value.toLowerCase() === 'org') {
-                        addrs[addrKey] = this.parseNumberToken(tokens.pop())
-                    } else if (token.value.toLowerCase() === 'align') {
-                        const alignment = 1 << this.parseNumberToken(tokens.pop())
+                    } else if (bit.toLowerCase() === 'org') {
+                        addrs[addrKey] = this.parseNumber(bits.pop())
+                    } else if (bit.toLowerCase() === 'align') {
+                        const alignment = 1 << this.parseNumber(bits.pop())
                         if (alignment > 0 && (addrs[addrKey] % alignment) !== 0) {
                             addrs[addrKey] += alignment - (addrs[addrKey] % alignment)
                         }
-                    } else if (token.value.toLowerCase() === 'include') {
+                    } else if (bit.toLowerCase() === 'include') {
                         this.error('Include not yet implemented in linker scripts', undefined, ctx)
                     }
                 }
@@ -311,13 +343,14 @@ export default class Linker {
         return ctx
     }
 
-    public parseNumberToken(t: Token | undefined): number {
-        if (t && t.type === TokenType.decimal_number) {
-            return parseInt(t.value, 10)
-        } else if (t && t.type === TokenType.hex_number) {
-            return parseInt(t.value.substr(1), 16)
-        } else {
+    public parseNumber(str: string | undefined): number {
+        if (!str) {
             return 0
+        }
+        if (str.startsWith('$')) {
+            return parseInt(str.substr(1), 16)
+        } else {
+            return parseInt(str, 10)
         }
     }
 
