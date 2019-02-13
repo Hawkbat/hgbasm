@@ -498,29 +498,30 @@ export default class Linker {
     public fillPatch(patch: IObjectPatch, link: ILinkSection, bs: BinarySerializer, ctx: LinkerContext): void {
         const val = this.calcPatchValue(patch, link, ctx)
         const index = 0x4000 * link.bank + link.start - (link.region === RegionType.romx ? 0x4000 : 0x0000) + patch.offset
+        const address = link.start + patch.offset
 
         this.logger.log('linkPatch', `Filling ${this.hexString(index)} = ${this.hexString(val)} `)
 
         bs.index = index
         if (patch.type === PatchType.byte) {
-            if (val < 0x00 || val > 0xFF) {
-                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 8 bits`, link.section, ctx)
+            if (val < -0x80 || val > 0xFF) {
+                this.error(`Calculated value (${this.hexString(val, 2)}) at ${patch.file}(${patch.line}) does not fit in 8 bits`, link.section, ctx)
             }
             bs.writeByte(val)
         } else if (patch.type === PatchType.word) {
-            if (val < 0x0000 || val > 0xFFFF) {
-                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 16 bits`, link.section, ctx)
+            if (val < -0x8000 || val > 0xFFFF) {
+                this.error(`Calculated value (${this.hexString(val, 4)}) at ${patch.file}(${patch.line}) does not fit in 16 bits`, link.section, ctx)
             }
             bs.writeShort(val)
         } else if (patch.type === PatchType.long) {
-            if (val < 0x00000000 || val > 0xFFFFFFFF) {
-                this.error(`Calculated value at ${patch.file}(${patch.line}) does not fit in 32 bits`, link.section, ctx)
+            if (val < -0x80000000 || val > 0xFFFFFFFF) {
+                this.error(`Calculated value (${this.hexString(val, 8)}) at ${patch.file}(${patch.line}) does not fit in 32 bits`, link.section, ctx)
             }
             bs.writeLong(val)
         } else if (patch.type === PatchType.jr) {
-            const result = val - (index + 2 - 1)
+            const result = val - (address + 2 - 1)
             if (result < -0x80 || result > 0x7F) {
-                this.error(`Calculated jump offset at ${patch.file}(${patch.line}) does not fit in 8 bits; try using JP instead`, link.section, ctx)
+                this.error(`Calculated jump offset (${this.hexString(result, 2)}) at ${patch.file}(${patch.line}) does not fit in 8 bits; try using JP instead`, link.section, ctx)
             }
             bs.writeByte(result)
         }
