@@ -408,7 +408,7 @@ export default class Linker {
                 }
                 const link = ctx.linkSections.find((l) => l.section === file.sections[symbol.sectionId])
                 if (link) {
-                    symbolMap[link.start + symbol.value] = { symbol, link }
+                    symbolMap[link.bank * 0x10000 + link.start + symbol.value] = { symbol, link }
                 }
             }
         }
