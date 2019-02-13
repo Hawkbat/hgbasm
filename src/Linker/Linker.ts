@@ -205,92 +205,7 @@ export default class Linker {
         let totalBanks = 1
 
         if (ctx.options.linkerScript) {
-            const lines = ctx.options.linkerScript.split(/\r?\n/g)
-
-            const addrs: { [key: string]: number } = {}
-            let region = RegionType.rom0
-            let bank = 0
-            let addrKey = ''
-
-            for (const line of lines) {
-                const bits = []
-                let next = ''
-                let inString = false
-                for (const c of line) {
-                    if (inString) {
-                        if (c === '"') {
-                            inString = false
-                            next += c
-                            if (next) {
-                                bits.push(next)
-                            }
-                            next = ''
-                        } else {
-                            next += c
-                        }
-                    } else {
-                        if (!inString && c === '"') {
-                            if (next) {
-                                bits.push(next)
-                            }
-                            next = c
-                            inString = true
-                        } else if (c === ';') {
-                            break
-                        } else if (c.trim()) {
-                            next += c
-                        } else {
-                            if (next) {
-                                bits.push(next)
-                            }
-                            next = ''
-                        }
-                    }
-                }
-                if (next) {
-                    bits.push(next)
-                }
-
-                bits.reverse()
-
-                while (bits.length) {
-                    let bit = bits.pop()
-                    if (!bit) {
-                        break
-                    }
-                    if (RegionType[bit.toLowerCase() as keyof typeof RegionType]) {
-                        region = RegionType[bit.toLowerCase() as keyof typeof RegionType]
-                        const regionType = ctx.regionTypeMap[region]
-                        if (regionType) {
-                            bank = this.parseNumber(bits.pop())
-                            addrKey = `${region}[${bank}]`
-                            addrs[addrKey] = addrs[addrKey] ? addrs[addrKey] : regionType.start
-                        } else {
-                            this.error(`Invalid region type "${bit}"`, undefined, ctx)
-                        }
-                    } else if (bit.startsWith('"')) {
-                        bit = bit.substr(1, bit.length - 2)
-                        const section = sections.find((s) => s.name === bit)
-                        if (section) {
-                            section.address = addrs[addrKey]
-                            section.region = region
-                            section.bank = bank
-                            addrs[addrKey] += section.size
-                        } else {
-                            this.error(`No matching section named "${bit}" found`, undefined, ctx)
-                        }
-                    } else if (bit.toLowerCase() === 'org') {
-                        addrs[addrKey] = this.parseNumber(bits.pop())
-                    } else if (bit.toLowerCase() === 'align') {
-                        const alignment = 1 << this.parseNumber(bits.pop())
-                        if (alignment > 0 && (addrs[addrKey] % alignment) !== 0) {
-                            addrs[addrKey] += alignment - (addrs[addrKey] % alignment)
-                        }
-                    } else if (bit.toLowerCase() === 'include') {
-                        this.error('Include not yet implemented in linker scripts', undefined, ctx)
-                    }
-                }
-            }
+            this.applyLinkerScript(sections, ctx)
         }
 
         for (const section of sections) {
@@ -598,6 +513,95 @@ export default class Linker {
         }
     }
 
+    public applyLinkerScript(sections: IObjectSection[], ctx: LinkerContext): void {
+        const lines = ctx.options.linkerScript.split(/\r?\n/g)
+
+        const addrs: { [key: string]: number } = {}
+        let region = RegionType.rom0
+        let bank = 0
+        let addrKey = ''
+
+        for (const line of lines) {
+            const bits = []
+            let next = ''
+            let inString = false
+            for (const c of line) {
+                if (inString) {
+                    if (c === '"') {
+                        inString = false
+                        next += c
+                        if (next) {
+                            bits.push(next)
+                        }
+                        next = ''
+                    } else {
+                        next += c
+                    }
+                } else {
+                    if (!inString && c === '"') {
+                        if (next) {
+                            bits.push(next)
+                        }
+                        next = c
+                        inString = true
+                    } else if (c === ';') {
+                        break
+                    } else if (c.trim()) {
+                        next += c
+                    } else {
+                        if (next) {
+                            bits.push(next)
+                        }
+                        next = ''
+                    }
+                }
+            }
+            if (next) {
+                bits.push(next)
+            }
+
+            bits.reverse()
+
+            while (bits.length) {
+                let bit = bits.pop()
+                if (!bit) {
+                    break
+                }
+                if (RegionType[bit.toLowerCase() as keyof typeof RegionType]) {
+                    region = RegionType[bit.toLowerCase() as keyof typeof RegionType]
+                    const regionType = ctx.regionTypeMap[region]
+                    if (regionType) {
+                        bank = this.parseNumber(bits.pop())
+                        addrKey = `${region}[${bank}]`
+                        addrs[addrKey] = addrs[addrKey] ? addrs[addrKey] : regionType.start
+                    } else {
+                        this.error(`Invalid region type "${bit}"`, undefined, ctx)
+                    }
+                } else if (bit.startsWith('"')) {
+                    bit = bit.substr(1, bit.length - 2)
+                    const section = sections.find((s) => s.name === bit)
+                    if (section) {
+                        section.address = addrs[addrKey]
+                        section.region = region
+                        section.bank = bank
+                        addrs[addrKey] += section.size
+                    } else {
+                        this.error(`No matching section named "${bit}" found`, undefined, ctx)
+                    }
+                } else if (bit.toLowerCase() === 'org') {
+                    addrs[addrKey] = this.parseNumber(bits.pop())
+                } else if (bit.toLowerCase() === 'align') {
+                    const alignment = 1 << this.parseNumber(bits.pop())
+                    if (alignment > 0 && (addrs[addrKey] % alignment) !== 0) {
+                        addrs[addrKey] += alignment - (addrs[addrKey] % alignment)
+                    }
+                } else if (bit.toLowerCase() === 'include') {
+                    this.error('Include not yet implemented in linker scripts', undefined, ctx)
+                }
+            }
+        }
+    }
+
     public allocate(section: IObjectSection, ctx: LinkerContext): ILinkSection | undefined {
         const file = ctx.sectionFileMap[section.name]
         const fixedAddr = section.address >= 0
@@ -672,7 +676,7 @@ export default class Linker {
     }
 
     public error(msg: string, section: IObjectSection | undefined, ctx: LinkerContext): void {
-        ctx.diagnostics.push(new Diagnostic('Linker', `${msg} ${section ? ` at section "${section.name}"` : ''} `, 'error'))
+        ctx.diagnostics.push(new Diagnostic('Linker', `${msg}${section ? ` at section "${section.name}"` : ''} `, 'error'))
     }
 
     private hexString(n: number, len: number = 4, noSymbol: boolean = false): string {
