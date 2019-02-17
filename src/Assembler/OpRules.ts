@@ -1615,8 +1615,58 @@ const OpRules: { [key: string]: IOpVariant[] } = {
     ],
     ldh: [
         {
+            args: ['[c]', 'a'],
+            opcode: 0xE2
+        },
+        {
+            args: ['[$FF00+c]', 'a'],
+            opcode: 0xE2
+        },
+        {
             args: ['[$FF00+n8]', 'a'],
             opcode: 0xE0
+        },
+        {
+            args: ['a', '[c]'],
+            opcode: 0xF2
+        },
+        {
+            args: ['a', '[$FF00+c]'],
+            opcode: 0xF2
+        },
+        {
+            args: ['a', '[$FF00+n8]'],
+            opcode: 0xF0
+        },
+        {
+            args: ['[n8]', 'a'],
+            opcode: 0xE0
+        },
+        {
+            args: ['a', '[n8]'],
+            opcode: 0xF0
+        }
+    ],
+    ldio: [
+        {
+            args: ['[c]', 'a'],
+            opcode: 0xE2
+        },
+        {
+            args: ['[$FF00+c]', 'a'],
+            opcode: 0xE2
+        },
+        {
+            args: ['[$FF00+n8]', 'a'],
+            opcode: 0xE0
+        },
+        {
+            args: ['a', '[c]'],
+            opcode: 0xF2
+        },
+        {
+            args: ['a', '[$FF00+c]'],
+            opcode: 0xF2
         },
         {
             args: ['a', '[$FF00+n8]'],
