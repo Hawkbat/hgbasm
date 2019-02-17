@@ -521,7 +521,7 @@ export default class Linker {
         } else if (patch.type === PatchType.jr) {
             const result = val - (address + 2 - 1)
             if (result < -0x80 || result > 0x7F) {
-                this.error(`Calculated jump offset (${this.hexString(result, 2)}) at ${patch.file}(${patch.line}) does not fit in 8 bits; try using JP instead`, link.section, ctx)
+                this.error(`Calculated jump offset (${this.hexString(result, 2)}) at ${patch.file}(${patch.line}) does not fit in signed 8-bit range; try using JP instead`, link.section, ctx)
             }
             bs.writeByte(result)
         }
