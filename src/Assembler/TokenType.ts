@@ -3,6 +3,7 @@ enum TokenType {
     start_of_line,
     semicolon_comment,
     asterisk_comment,
+    directive,
     string,
     string_escape,
     macro_escape,

@@ -50,6 +50,9 @@ export default class Parser {
         [TokenType.asterisk_comment]: (token) => {
             return new Node(NodeType.comment, token, [])
         },
+        [TokenType.directive]: (token) => {
+            return new Node(NodeType.directive, token, [])
+        },
         [TokenType.string]: (token) => {
             return new Node(NodeType.string, token, [])
         },

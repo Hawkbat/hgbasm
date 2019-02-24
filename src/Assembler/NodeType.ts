@@ -4,6 +4,7 @@ enum NodeType {
     invalid,
     line,
     comment,
+    directive,
     string,
     unary_operator,
     binary_operator,

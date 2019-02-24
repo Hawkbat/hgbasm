@@ -40,6 +40,11 @@ export default class Lexer {
             startOfLine: true
         },
         {
+            type: TokenType.directive,
+            start: [MatchType.one, ['#']],
+            startOfLine: true
+        },
+        {
             type: TokenType.string,
             start: [MatchType.one, ['"']],
             end: [MatchType.one, ['"']]

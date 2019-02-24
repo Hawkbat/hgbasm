@@ -5,6 +5,7 @@ import ExprType from '../Linker/ExprType'
 import PatchType from '../Linker/PatchType'
 import SymbolType from '../Linker/SymbolType'
 import Logger from '../Logger'
+import AssemblerMode from './AssemblerMode'
 import EvaluatorContext from './EvaluatorContext'
 import FileContext from './FileContext'
 import LineContext from './LineContext'
@@ -17,6 +18,7 @@ import TokenType from './TokenType'
 type EvaluatorRule = (state: ILineState, op: Node, label: Node | null, ctx: EvaluatorContext) => void | Promise<void>
 type ConstExprRule = (op: Node, ctx: EvaluatorContext) => number | string
 type PredefineRule = (ctx: EvaluatorContext) => number | string
+type DirectiveRule = (ctx: EvaluatorContext, args: string[]) => void
 
 const regexpCache: { [key: string]: RegExp } = {}
 
@@ -635,6 +637,20 @@ export default class Evaluator {
     }
 
     public evalRules: { [key: number]: EvaluatorRule } = {
+        [NodeType.directive]: (_, op, __, ctx) => {
+            const args = op.token.value.split(/\s+/)
+            const key = args.shift()
+            if (!key) {
+                this.error('Empty directive', op.token, ctx)
+                return
+            }
+            const rule = this.directiveRules[key.substr(1)]
+            if (!rule) {
+                this.error('No directive evaluation rule matches', op.token, ctx)
+                return
+            }
+            rule(ctx, args)
+        },
         [NodeType.unary_operator]: (state, op, label, ctx) => {
             if (op.token.value === '=') {
                 const labelId = label ? label.token.value.replace(/:/g, '') : ''
@@ -877,6 +893,20 @@ export default class Evaluator {
             this.logger.log('exitScope', 'Exit macro call', op.token.value, '\n')
 
             state.inMacroCalls.shift()
+        }
+    }
+
+    public directiveRules: { [key: string]: DirectiveRule } = {
+        mode: (ctx, args) => {
+            if (args.length !== 1) {
+                this.error('Directive expects exactly one argument', undefined, ctx)
+                return
+            }
+            const mode = args[0] as AssemblerMode
+            if (!Object.values(AssemblerMode).some((v) => v === mode)) {
+                this.error('Unsupported mode provided', undefined, ctx)
+            }
+            ctx.context.mode = mode
         }
     }
 
