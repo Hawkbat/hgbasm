@@ -17,7 +17,7 @@ import TokenType from './TokenType'
 
 type EvaluatorRule = (state: ILineState, op: Node, label: Node | null, ctx: EvaluatorContext) => void | Promise<void>
 type ConstExprRule = (op: Node, ctx: EvaluatorContext) => number | string
-type PredefineRule = (ctx: EvaluatorContext) => number | string
+type PredefineRule = (op: Node, ctx: EvaluatorContext) => number | string
 type DirectiveRule = (ctx: EvaluatorContext, args: string[]) => void
 
 const regexpCache: { [key: string]: RegExp } = {}
@@ -1323,7 +1323,7 @@ export default class Evaluator {
                         if (source.indexOf(key) === -1) {
                             continue
                         }
-                        const val = this.predefineRules[key](ctx)
+                        const val = this.predefineRules[key](op, ctx)
                         const value = typeof val === 'string' ? val : `$${val.toString(16).toUpperCase()}`
                         const regex = getCachedRegExp(`\\{${key}\\}`)
                         const newSource = this.applySourceReplace(source, regex, value)
@@ -1422,7 +1422,7 @@ export default class Evaluator {
         [NodeType.identifier]: (op, ctx) => {
             const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
             if (this.predefineRules[id]) {
-                return this.predefineRules[id](ctx)
+                return this.predefineRules[id](op, ctx)
             }
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
                 return ctx.state.numberEquates[id].value
@@ -1466,31 +1466,31 @@ export default class Evaluator {
 
     public predefineRules: { [key: string]: PredefineRule } = {
         _PI: () => Math.round(Math.PI * 65536),
-        _RS: (ctx) => ctx.state.rsCounter ? ctx.state.rsCounter : 0,
-        _NARG: (ctx) => {
+        _RS: (_, ctx) => ctx.state.rsCounter ? ctx.state.rsCounter : 0,
+        _NARG: (_, ctx) => {
             if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
                 return ctx.state.inMacroCalls[0].args.length
             } else {
                 return 0
             }
         },
-        __LINE__: (ctx) => ctx.state.line,
-        __FILE__: (ctx) => ctx.state.file,
-        __DATE__: (ctx) => {
+        __LINE__: (_, ctx) => ctx.state.line,
+        __FILE__: (_, ctx) => ctx.state.file,
+        __DATE__: (_, ctx) => {
             const date = ctx.context.startDateTime
             const days = date.getDate().toString().padStart(2, '0')
             const month = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][date.getMonth()]
             const year = date.getFullYear()
             return `${days} ${month} ${year}`
         },
-        __TIME__: (ctx) => {
+        __TIME__: (_, ctx) => {
             const date = ctx.context.startDateTime
             const hours = date.getHours().toString().padStart(2, '0')
             const minutes = date.getMinutes().toString().padStart(2, '0')
             const seconds = date.getSeconds().toString().padStart(2, '0')
             return `${hours}:${minutes}:${seconds}`
         },
-        __ISO_8601_LOCAL__: (ctx) => {
+        __ISO_8601_LOCAL__: (_, ctx) => {
             const date = ctx.context.startDateTime
             const pad = (n: number) => n < 10 ? `0${n}` : `${n}`
             const tz = date.getTimezoneOffset()
@@ -1503,16 +1503,19 @@ export default class Evaluator {
             }
             return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds()) + tzs}`
         },
-        __ISO_8601_UTC__: (ctx) => `${ctx.context.startDateTime.toISOString()}`,
-        __UTC_YEAR__: (ctx) => `${ctx.context.startDateTime.getUTCFullYear()}`,
-        __UTC_MONTH__: (ctx) => `${ctx.context.startDateTime.getUTCMonth() + 1}`,
-        __UTC_DAY__: (ctx) => `${ctx.context.startDateTime.getUTCDay() + 1}`,
-        __UTC_HOUR__: (ctx) => `${ctx.context.startDateTime.getUTCHours()}`,
-        __UTC_MINUTE__: (ctx) => `${ctx.context.startDateTime.getUTCMinutes()}`,
-        __UTC_SECOND__: (ctx) => `${ctx.context.startDateTime.getUTCSeconds()}`,
+        __ISO_8601_UTC__: (_, ctx) => `${ctx.context.startDateTime.toISOString()}`,
+        __UTC_YEAR__: (_, ctx) => `${ctx.context.startDateTime.getUTCFullYear()}`,
+        __UTC_MONTH__: (_, ctx) => `${ctx.context.startDateTime.getUTCMonth() + 1}`,
+        __UTC_DAY__: (_, ctx) => `${ctx.context.startDateTime.getUTCDay() + 1}`,
+        __UTC_HOUR__: (_, ctx) => `${ctx.context.startDateTime.getUTCHours()}`,
+        __UTC_MINUTE__: (_, ctx) => `${ctx.context.startDateTime.getUTCMinutes()}`,
+        __UTC_SECOND__: (_, ctx) => `${ctx.context.startDateTime.getUTCSeconds()}`,
         __RGBDS_MAJOR__: () => 0,
         __RGBDS_MINOR__: () => 3,
-        __RGBDS_PATCH__: () => 7
+        __RGBDS_PATCH__: () => 7,
+        __HGBASM_MAJOR__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.major : 0,
+        __HGBASM_MINOR__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.minor : 0,
+        __HGBASM_PATCH__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.patch : 0
     }
 
     public linkExprBinaryRules: { [key: string]: ExprType } = {
@@ -1899,6 +1902,14 @@ export default class Evaluator {
             matches = regex.exec(source)
         }
         return source
+    }
+
+    public isFeatureEnabled(feature: string, token: Token | undefined, ctx: EvaluatorContext): boolean {
+        if (ctx.context.mode !== AssemblerMode.new_features_enabled) {
+            this.error(`Cannot use HGBASM-specific feature "${feature}" in RGBDS compatibility mode; add "#mode hgbasm" to a previous line to enable it`, token, ctx)
+            return false
+        }
+        return true
     }
 
     public error(msg: string, token: Token | undefined, ctx: EvaluatorContext): void {

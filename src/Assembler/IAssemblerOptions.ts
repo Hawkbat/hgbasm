@@ -1,3 +1,4 @@
+import IVersion from '../IVersion'
 
 export default interface IAssemblerOptions {
     padding: number
@@ -6,4 +7,5 @@ export default interface IAssemblerOptions {
     optimizeLd: boolean
     debugDefineName: string
     debugDefineValue: string
+    version: IVersion
 }
