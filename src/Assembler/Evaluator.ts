@@ -1515,7 +1515,11 @@ export default class Evaluator {
         __RGBDS_PATCH__: () => 7,
         __HGBASM_MAJOR__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.major : 0,
         __HGBASM_MINOR__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.minor : 0,
-        __HGBASM_PATCH__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.patch : 0
+        __HGBASM_PATCH__: (op, ctx) => this.isFeatureEnabled('version', op.token, ctx) ? ctx.context.options.version.patch : 0,
+        TRUE: (op, ctx) => this.isFeatureEnabled('bool_constants', op.token, ctx) ? 1 : 0,
+        FALSE: (op, ctx) => this.isFeatureEnabled('bool_constants', op.token, ctx) ? 0 : 0,
+        true: (op, ctx) => this.isFeatureEnabled('bool_constants', op.token, ctx) ? 1 : 0,
+        false: (op, ctx) => this.isFeatureEnabled('bool_constants', op.token, ctx) ? 0 : 0
     }
 
     public linkExprBinaryRules: { [key: string]: ExprType } = {
