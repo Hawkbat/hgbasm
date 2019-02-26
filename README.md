@@ -6,6 +6,25 @@ A Visual Studio Code plugin will also be available after future milestones are c
 
 Note that this project is not a perfect port of the RGBDS suite and is not guaranteed to accept every valid assembly file or generate binary-compatible output. However, issues related to compatibility will be addressed as they are reported, especially if there is no suitably trivial workaround available. Pull requests welcome.
 
+
+## Features
+HGBASM normally runs in an RGBDS-compatible mode with no new features enabled. To enable full HGBASM mode, add this directive to the top of your source file:
+```
+#mode hgbasm
+```
+In addition to normal RGBDS functionality, the following HGBASM-specific features are available:
+### Additional Predefined Symbols
+
+|Name|Type|Value|
+|----|----|-----|
+|`__HGBASM_MAJOR__`|`EQU`|Current HGBASM major version number|
+|`__HGBASM_MINOR__`|`EQU`|Current HGBASM minor version number|
+|`__HGBASM_PATCH__`|`EQU`|Current HGBASM patch version number|
+|`TRUE`|`EQU`|1|
+|`FALSE`|`EQU`|0|
+|`true`|`EQU`|1|
+|`false`|`EQU`|0|
+
 ## Status
 - [X] Assembler (RGBASM equivalent)
 - [X] Linker (RGBLINK equivalent)
