@@ -156,6 +156,60 @@ export default class Linker {
         [ExprType.bank_current]: (values, _, __, link) => {
             values.push(link.bank)
         },
+        [ExprType.sizeof_id]: (values, bs, _, link, ctx) => {
+            const symbol = link.file.symbols[bs.readLong()]
+            if (symbol.name === '@') {
+                values.push(link.section.size)
+                return
+            }
+            const symLink = ctx.linkSections.find((l) => l.section === link.file.sections[symbol.sectionId])
+            if (symLink) {
+                const start = symbol.value
+                const end = link.file.symbols.reduce((p, c) =>
+                    c.sectionId === symLink.section.id &&
+                        c.type !== SymbolType.Imported &&
+                        c.value > start &&
+                        (symbol.name.includes('.') || !c.name.includes('.')) ?
+                        Math.min(c.value, p) :
+                        p,
+                    symLink.section.size)
+                values.push(end - start)
+                return
+            } else if (symbol.type === SymbolType.Imported) {
+                for (const file of ctx.objectFiles) {
+                    const otherSymbol = file.symbols.find((s) => s.type === SymbolType.Exported && s.name === symbol.name)
+                    if (otherSymbol) {
+                        const otherLink = ctx.linkSections.find((l) => l.section === file.sections[otherSymbol.sectionId])
+                        if (otherLink) {
+                            const start = otherSymbol.value
+                            const end = file.symbols.reduce((p, c) =>
+                                c.sectionId === otherLink.section.id &&
+                                    c.type !== SymbolType.Imported &&
+                                    c.value > start &&
+                                    (otherSymbol.name.includes('.') || !c.name.includes('.')) ?
+                                    Math.min(c.value, p) :
+                                    p,
+                                otherLink.section.size)
+                            values.push(end - start)
+                            return
+                        }
+                    }
+                }
+            }
+            this.error(`Could not find a definition for symbol "${symbol.name}"`, link.section, ctx)
+        },
+        [ExprType.sizeof_section]: (values, bs, _, link, ctx) => {
+            const sectionName = bs.readString()
+            const otherLink = ctx.linkSections.find((l) => l.section.name === sectionName)
+            if (otherLink) {
+                values.push(otherLink.section.size)
+                return
+            }
+            this.error(`Could not find a linked section named "${sectionName}"`, link.section, ctx)
+        },
+        [ExprType.sizeof_current]: (values, _, __, link) => {
+            values.push(link.section.size)
+        },
         [ExprType.hram_check]: (values, _, __, link, ctx) => {
             const a = values.pop() as number
             if (a >= 0xFF00 && a <= 0xFFFF) {

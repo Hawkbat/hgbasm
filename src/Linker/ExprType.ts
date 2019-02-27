@@ -25,6 +25,9 @@ enum ExprType {
     bank_section = 0x51,
     bank_current = 0x52,
     hram_check = 0x60,
+    sizeof_id = 0x70,
+    sizeof_section = 0x71,
+    sizeof_current = 0x72,
     immediate_int = 0x80,
     immediate_id = 0x81
 }

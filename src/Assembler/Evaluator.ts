@@ -1109,6 +1109,33 @@ export default class Evaluator {
                 return 0
             }
         },
+        sizeof: (op, ctx) => {
+            if (!this.isFeatureEnabled('sizeof', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 2) {
+                const val = op.children[1].token.value.toLowerCase()
+                if (val === 'a' || val === 'b' || val === 'c' || val === 'd' || val === 'e' || val === 'f' || val === 'h' || val === 'l') {
+                    return 1
+                } else if (val === 'af' || val === 'bc' || val === 'de' || val === 'hl' || val === 'sp') {
+                    return 2
+                }
+                const num = this.calcConstExpr(op.children[1], 'number', ctx)
+                if (num >= -0x80 && num <= 0xFF) {
+                    return 1
+                }
+                if (num >= -0x8000 && num <= 0xFFFF) {
+                    return 2
+                }
+                if (num >= -0x80000000 && num <= 0xFFFFFFFF) {
+                    return 4
+                }
+                return 8
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
         int: (op, ctx) => {
             if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
                 return 0
@@ -1733,6 +1760,10 @@ export default class Evaluator {
     public calcConstExpr(op: Node, expected: 'either', ctx: EvaluatorContext): number | string
     public calcConstExpr(op: Node, expected: 'number' | 'string' | 'either', ctx: EvaluatorContext): number | string {
         const defaultValue = (expected === 'string') ? '' : 0
+        if (!this.isConstExpr(op, ctx)) {
+            this.error('Expression must be constant', op.token, ctx)
+            return defaultValue
+        }
         let rule = this.constExprRules[op.type]
         if (!rule) {
             rule = this.constExprRules[op.token.value.toLowerCase()]
@@ -1783,6 +1814,21 @@ export default class Evaluator {
             }
             return false
         }
+        if (op.type === NodeType.function_call) {
+            const func = op.children[0].token.value.toLowerCase()
+            if (func === 'bank' && this.isConstExpr(op.children[1], ctx) && this.getConstExprType(op.children[1]) === 'string') {
+                return false
+            }
+            if (func === 'sizeof' && this.isConstExpr(op.children[1], ctx) && this.getConstExprType(op.children[1]) === 'string') {
+                return false
+            }
+            for (const child of op.children.slice(1)) {
+                if (!this.isConstExpr(child, ctx)) {
+                    return false
+                }
+            }
+            return true
+        }
         for (const child of op.children) {
             if (!this.isConstExpr(child, ctx)) {
                 return false
@@ -1797,7 +1843,7 @@ export default class Evaluator {
         }
         if (op.type === NodeType.function_call) {
             const func = op.children[0].token.value.toLowerCase()
-            if (func === 'strcat' || func === 'strsub' || func === 'strupr' || func === 'strlwr') {
+            if (func === 'strcat' || func === 'strsub' || func === 'strupr' || func === 'strlwr' || func === 'strrpl' || func === 'dec' || func === 'oct' || func === 'hex' || func === 'bin') {
                 return 'string'
             }
         }
@@ -1828,7 +1874,8 @@ export default class Evaluator {
                 break
             }
             case NodeType.function_call: {
-                if (op.children[0].token.value.toLowerCase() === 'bank') {
+                const name = op.children[0].token.value.toLowerCase()
+                if (name === 'bank') {
                     if (op.children[1].token.value === '@') {
                         bs.writeByte(ExprType.bank_current)
                     } else if (op.children[1].type === NodeType.identifier) {
@@ -1856,11 +1903,11 @@ export default class Evaluator {
                         }
                     } else if (this.isConstExpr(op.children[1], ctx) && this.getConstExprType(op.children[1]) === 'string') {
                         bs.writeByte(ExprType.bank_section)
-                        bs.writeString(this.calcConstExpr(op, 'string', ctx))
+                        bs.writeString(this.calcConstExpr(op.children[1], 'string', ctx))
                     } else {
                         this.error('No link expression rule matches function', op.children[0].token, ctx)
                     }
-                } else if (op.children[0].token.value.toLowerCase() === 'high') {
+                } else if (name === 'high') {
                     bs.writeByte(ExprType.immediate_int)
                     bs.writeLong(0xFF00)
                     this.buildLinkExpr(bs, op.children[1], ctx)
@@ -1868,11 +1915,46 @@ export default class Evaluator {
                     bs.writeByte(ExprType.immediate_int)
                     bs.writeLong(8)
                     bs.writeByte(ExprType.shift_right)
-                } else if (op.children[0].token.value.toLowerCase() === 'low') {
+                } else if (name === 'low') {
                     bs.writeByte(ExprType.immediate_int)
                     bs.writeLong(0x00FF)
                     this.buildLinkExpr(bs, op.children[1], ctx)
                     bs.writeByte(ExprType.bitwise_and)
+                } else if (name === 'sizeof') {
+                    if (!this.isFeatureEnabled('sizeof', op.token, ctx)) {
+                        break
+                    }
+                    if (op.children[1].token.value === '@') {
+                        bs.writeByte(ExprType.sizeof_current)
+                    } else if (op.children[1].type === NodeType.identifier) {
+                        let id = op.children[1].token.value
+                        if (id.startsWith('.')) {
+                            id = ctx.state.inLabel + id
+                        }
+                        const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
+                        if (symbol) {
+                            bs.writeByte(ExprType.sizeof_id)
+                            bs.writeLong(symbol.id)
+                        } else {
+                            const newSymbolId = ctx.context.objectFile.symbols.length
+                            ctx.context.objectFile.symbols.push({
+                                id: newSymbolId,
+                                name: id,
+                                type: SymbolType.Imported,
+                                file: '',
+                                line: -1,
+                                sectionId: -1,
+                                value: -1
+                            })
+                            bs.writeByte(ExprType.sizeof_id)
+                            bs.writeLong(newSymbolId)
+                        }
+                    } else if (this.isConstExpr(op.children[1], ctx) && this.getConstExprType(op.children[1]) === 'string') {
+                        bs.writeByte(ExprType.sizeof_section)
+                        bs.writeString(this.calcConstExpr(op.children[1], 'string', ctx))
+                    } else {
+                        this.error('No link expression rule matches function', op.children[0].token, ctx)
+                    }
                 } else {
                     this.error('No link expression rule matches function', op.children[0].token, ctx)
                 }

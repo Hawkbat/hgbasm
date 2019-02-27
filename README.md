@@ -35,6 +35,14 @@ In addition to normal RGBDS functionality, the following HGBASM-specific feature
 ### Additional String Functions
 - `STRRPL(source, pattern, replacement)` finds all occurances of the string `pattern` within `source` and replaces them with the string `replacement`.
 
+### Size-Of Function
+- `SIZEOF(@)` returns the size in bytes of the current section. Cannot be used in constant expressions.
+- `SIZEOF("section name")` returns the size in bytes of the named section. Cannot be used in constant expressions.
+- `SIZEOF(global_label)` returns the number of bytes from the specified global label until the next defined global label. Cannot be used in constant expressions.
+- `SIZEOF(.local_label)` returns the number of bytes from the specified local label until the next defined local or global label. Cannot be used in constant expressions.
+- `SIZEOF(number)` returns the smallest number of bytes needed to fit the number.
+- `SIZEOF(register)` returns the size of the specified register (1 for a, b, c, d, e, h, l; 2 for af, bc, de, hl, sp).
+
 ## Status
 - [X] Assembler (RGBASM equivalent)
 - [X] Linker (RGBLINK equivalent)
