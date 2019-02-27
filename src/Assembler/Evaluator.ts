@@ -1173,6 +1173,20 @@ export default class Evaluator {
                 this.error('Function needs exactly one argument', op.children[0].token, ctx)
                 return ''
             }
+        },
+        strrpl: (op, ctx) => {
+            if (!this.isFeatureEnabled('string_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 4) {
+                const source = this.calcConstExpr(op.children[1], 'string', ctx)
+                const pattern = this.calcConstExpr(op.children[2], 'string', ctx)
+                const replacement = this.calcConstExpr(op.children[3], 'string', ctx)
+                return source.split(pattern).join(replacement)
+            } else {
+                this.error('Function needs exactly three arguments', op.children[0].token, ctx)
+                return ''
+            }
         }
     }
 

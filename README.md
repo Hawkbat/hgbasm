@@ -32,6 +32,9 @@ In addition to normal RGBDS functionality, the following HGBASM-specific feature
 - `OCT(num)` converts a number to its octal string representation, without a prefix symbol.
 - `BIN(num)` converts a number to its binary string representation, without a prefix symbol.
 
+### Additional String Functions
+- `STRRPL(source, pattern, replacement)` finds all occurances of the string `pattern` within `source` and replaces them with the string `replacement`.
+
 ## Status
 - [X] Assembler (RGBASM equivalent)
 - [X] Linker (RGBLINK equivalent)
