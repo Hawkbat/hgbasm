@@ -13,8 +13,8 @@ HGBASM normally runs in an RGBDS-compatible mode with no new features enabled. T
 #mode hgbasm
 ```
 In addition to normal RGBDS functionality, the following HGBASM-specific features are available:
-### Additional Predefined Symbols
 
+### Additional Predefined Symbols
 |Name|Type|Value|
 |----|----|-----|
 |`__HGBASM_MAJOR__`|`EQU`|Current HGBASM major version number|
@@ -24,6 +24,13 @@ In addition to normal RGBDS functionality, the following HGBASM-specific feature
 |`FALSE`|`EQU`|0|
 |`true`|`EQU`|1|
 |`false`|`EQU`|0|
+
+### String/Integer Conversion Functions
+- `INT(str)` converts a string to an integer. The base is determined by the prefix (`$` for hexadecimal, `&` for octal, `%` for binary, and no prefix for decimal).
+- `DEC(num)` converts a number to its decimal string representation.
+- `HEX(num)` converts a number to its hexadecimal string representation, without a prefix symbol.
+- `OCT(num)` converts a number to its octal string representation, without a prefix symbol.
+- `BIN(num)` converts a number to its binary string representation, without a prefix symbol.
 
 ## Status
 - [X] Assembler (RGBASM equivalent)

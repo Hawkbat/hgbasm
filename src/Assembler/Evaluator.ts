@@ -1108,6 +1108,71 @@ export default class Evaluator {
                 this.error('Function needs exactly one argument', op.children[0].token, ctx)
                 return 0
             }
+        },
+        int: (op, ctx) => {
+            if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 2) {
+                const str = this.calcConstExpr(op.children[1], 'string', ctx)
+                if (str.startsWith('$')) {
+                    return parseInt(str.substr(1), 16)
+                }
+                if (str.startsWith('&')) {
+                    return parseInt(str.substr(1), 8)
+                }
+                if (str.startsWith('%')) {
+                    return parseInt(str.substr(1), 2)
+                }
+                return parseInt(str, 10)
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return 0
+            }
+        },
+        dec: (op, ctx) => {
+            if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 2) {
+                return `${this.calcConstExpr(op.children[1], 'number', ctx).toString(10)}`
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        hex: (op, ctx) => {
+            if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 2) {
+                return `${this.calcConstExpr(op.children[1], 'number', ctx).toString(16).toUpperCase()}`
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        oct: (op, ctx) => {
+            if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 2) {
+                return `${this.calcConstExpr(op.children[1], 'number', ctx).toString(8)}`
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        bin: (op, ctx) => {
+            if (!this.isFeatureEnabled('conversion_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 2) {
+                return `${this.calcConstExpr(op.children[1], 'number', ctx).toString(2)}`
+            } else {
+                this.error('Function needs exactly one argument', op.children[0].token, ctx)
+                return ''
+            }
         }
     }
 
