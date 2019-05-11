@@ -633,7 +633,7 @@ export default class Evaluator {
                 this.error('Keyword needs exactly one argument', op.token, ctx)
                 return
             }
-            this.logger.log('info', `$${this.calcConstExpr(op.children[0], 'number', ctx).toString(16).toUpperCase()}`, '\n')
+            this.logger.log('info', `$${(this.calcConstExpr(op.children[0], 'number', ctx) >>> 0).toString(16).toUpperCase()}`, '\n')
         },
         printi: (_, op, __, ctx) => {
             if (op.children.length !== 1) {
