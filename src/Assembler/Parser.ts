@@ -137,9 +137,13 @@ export default class Parser {
             return new Node(NodeType.number_literal, token, [])
         },
         [TokenType.open_bracket]: (token, ctx) => {
-            const right = this.parseNode(this.getPrecedence(false, token), ctx)
+            const children: Node[] = []
+            if (!this.peekToken(TokenType.close_bracket, ctx)) {
+                const right = this.parseNode(this.getPrecedence(false, token), ctx)
+                children.push(right)
+            }
             this.consumeToken(TokenType.close_bracket, ctx)
-            return new Node(NodeType.indexer, token, [right])
+            return new Node(NodeType.indexer, token, children)
         },
         [TokenType.open_paren]: (token, ctx) => {
             const right = this.parseNode(this.getPrecedence(false, token), ctx)
@@ -156,21 +160,27 @@ export default class Parser {
             return left
         },
         [TokenType.open_bracket]: (left, token, ctx) => {
-            const right = this.parseNode(0, ctx)
+            const children: Node[] = []
+            if (!this.peekToken(TokenType.close_bracket, ctx)) {
+                const right = this.parseNode(0, ctx)
+                children.push(right)
+            }
             this.consumeToken(TokenType.close_bracket, ctx)
-            const node = new Node(NodeType.indexer, token, [right])
+            const node = new Node(NodeType.indexer, token, children)
             left.children.push(node)
             return left
         },
         [TokenType.open_paren]: (left, token, ctx) => {
             const children: Node[] = []
             children.push(left)
-            let right = this.parseNode(0, ctx)
-            children.push(right)
-            while (this.peekToken(TokenType.comma, ctx)) {
-                this.consumeToken(TokenType.comma, ctx)
-                right = this.parseNode(0, ctx)
+            if (!this.peekToken(TokenType.close_paren, ctx)) {
+                let right = this.parseNode(0, ctx)
                 children.push(right)
+                while (this.peekToken(TokenType.comma, ctx)) {
+                    this.consumeToken(TokenType.comma, ctx)
+                    right = this.parseNode(0, ctx)
+                    children.push(right)
+                }
             }
             this.consumeToken(TokenType.close_paren, ctx)
             return new Node(NodeType.function_call, token, children)
