@@ -1229,6 +1229,20 @@ export default class Evaluator {
                 this.error('Function needs exactly three arguments', op.children[0].token, ctx)
                 return ''
             }
+        },
+        strpad: (op, ctx) => {
+            if (!this.isFeatureEnabled('string_functions', op.token, ctx)) {
+                return ''
+            }
+            if (op.children.length === 4) {
+                const source = this.calcConstExpr(op.children[1], 'string', ctx)
+                const pad = this.calcConstExpr(op.children[2], 'string', ctx)
+                const length = this.calcConstExpr(op.children[3], 'number', ctx)
+                return length < 0 ? source.padEnd(Math.abs(length), pad) : source.padStart(Math.abs(length), pad)
+            } else {
+                this.error('Function needs exactly three arguments', op.children[0].token, ctx)
+                return ''
+            }
         }
     }
 

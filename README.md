@@ -34,6 +34,7 @@ In addition to normal RGBDS functionality, the following HGBASM-specific feature
 
 ### Additional String Functions
 - `STRRPL(source, pattern, replacement)` finds all occurances of the string `pattern` within `source` and replaces them with the string `replacement`.
+- `STRPAD(source, pad, length)` prepends the character `pad` to the string `source` until the length is equal to the absolute value of `length`. If `length` is negative, `pad` is appended instead of prepended.
 
 ### Size-Of Function
 - `SIZEOF(@)` returns the size in bytes of the current section. Cannot be used in constant expressions.

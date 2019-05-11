@@ -94,7 +94,7 @@ export default class Lexer {
         },
         {
             type: TokenType.function,
-            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low', 'int', 'dec', 'hex', 'oct', 'bin', 'strrpl', 'sizeof']]],
+            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low', 'int', 'dec', 'hex', 'oct', 'bin', 'strrpl', 'sizeof', 'strpad']]],
             end: [MatchType.one, ['(']],
             endLookahead: true
         },
