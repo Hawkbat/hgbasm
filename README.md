@@ -36,6 +36,13 @@ In addition to normal RGBDS functionality, the following HGBASM-specific feature
 - `STRRPL(source, pattern, replacement)` finds all occurances of the string `pattern` within `source` and replaces them with the string `replacement`.
 - `STRPAD(source, pad, length)` prepends the character `pad` to the string `source` until the length is equal to the absolute value of `length`. If `length` is negative, `pad` is appended instead of prepended.
 
+### Random Number Generation
+- `RANDINT(min, max)` returns a random integer from min (inclusive) to max (inclusive).
+- `RANDBYTE()` returns a random value from $00 to $FF.
+- `RANDWORD()` returns a random value from $0000 to $FFFF.
+- `RANDLONG()` returns a random value from $00000000 to $FFFFFFFF.
+- `RESEED seed` is a keyword that resets the random number generator and sets its initial seed to the number or string `seed`.
+
 ### Size-Of Function
 - `SIZEOF(@)` returns the size in bytes of the current section. Cannot be used in constant expressions.
 - `SIZEOF("section name")` returns the size in bytes of the named section. Cannot be used in constant expressions.
