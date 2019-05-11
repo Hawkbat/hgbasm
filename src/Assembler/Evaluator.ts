@@ -648,6 +648,16 @@ export default class Evaluator {
                 return
             }
             this.logger.log('info', `${this.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, '\n')
+        },
+        reseed: (_, op, __, ctx) => {
+            if (!this.isFeatureEnabled('random_functions', op.token, ctx)) {
+                return
+            }
+            if (op.children.length !== 1) {
+                this.error('Keyword needs exactly one argument', op.token, ctx)
+                return
+            }
+            ctx.context.rng.seed(this.calcConstExpr(op.children[0], 'either', ctx))
         }
     }
 
@@ -1241,6 +1251,52 @@ export default class Evaluator {
                 return length < 0 ? source.padEnd(Math.abs(length), pad) : source.padStart(Math.abs(length), pad)
             } else {
                 this.error('Function needs exactly three arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        randint: (op, ctx) => {
+            if (!this.isFeatureEnabled('random_functions', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 3) {
+                const min = this.calcConstExpr(op.children[1], 'number', ctx)
+                const max = this.calcConstExpr(op.children[2], 'number', ctx)
+                return ctx.context.rng.range(min, max)
+            } else {
+                this.error('Function needs exactly two arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        randbyte: (op, ctx) => {
+            if (!this.isFeatureEnabled('random_functions', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 1) {
+                return ctx.context.rng.byte()
+            } else {
+                this.error('Function needs exactly zero arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        randword: (op, ctx) => {
+            if (!this.isFeatureEnabled('random_functions', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 1) {
+                return ctx.context.rng.word()
+            } else {
+                this.error('Function needs exactly zero arguments', op.children[0].token, ctx)
+                return ''
+            }
+        },
+        randlong: (op, ctx) => {
+            if (!this.isFeatureEnabled('random_functions', op.token, ctx)) {
+                return 0
+            }
+            if (op.children.length === 1) {
+                return ctx.context.rng.long()
+            } else {
+                this.error('Function needs exactly zero arguments', op.children[0].token, ctx)
                 return ''
             }
         }

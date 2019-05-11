@@ -1,6 +1,7 @@
 import Diagnostic from '../Diagnostic'
 import IFileProvider from '../IFileProvider'
 import IObjectFile from '../Linker/IObjectFile'
+import RandGen from '../RandGen'
 import Assembler from './Assembler'
 import AssemblerMode from './AssemblerMode'
 import FileContext from './FileContext'
@@ -18,6 +19,7 @@ export default class AssemblerContext {
     public dependencies: string[] = []
     public patches: IPatch[] = []
     public diagnostics: Diagnostic[] = []
+    public rng: RandGen
 
     constructor(assembler: Assembler, options: IAssemblerOptions, file: FileContext, fileProvider: IFileProvider) {
         this.assembler = assembler
@@ -26,5 +28,6 @@ export default class AssemblerContext {
         this.fileProvider = fileProvider
         this.objectFile = { path: file.source.path, symbols: [], sections: [] }
         this.startDateTime = new Date()
+        this.rng = new RandGen(Date.now())
     }
 }

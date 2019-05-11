@@ -86,7 +86,7 @@ export default class Lexer {
         },
         {
             type: TokenType.keyword,
-            rules: [[MatchType.one, ['include', 'incbin', 'export', 'global', 'union', 'nextu', 'endu', 'printt', 'printv', 'printi', 'printf', 'fail', 'warn', 'if', 'elif', 'else', 'endc', 'purge', 'rept', 'endr', 'opt', 'popo', 'pusho', 'pops', 'pushs', 'equ', 'set', 'equs', 'macro', 'endm', 'shift', 'charmap', 'rsreset', 'rsset', 'rb', 'rw', 'rl', 'db', 'dw', 'dl', 'ds', 'section', 'align']]]
+            rules: [[MatchType.one, ['include', 'incbin', 'export', 'global', 'union', 'nextu', 'endu', 'printt', 'printv', 'printi', 'printf', 'fail', 'warn', 'if', 'elif', 'else', 'endc', 'purge', 'rept', 'endr', 'opt', 'popo', 'pusho', 'pops', 'pushs', 'equ', 'set', 'equs', 'macro', 'endm', 'shift', 'charmap', 'rsreset', 'rsset', 'rb', 'rw', 'rl', 'db', 'dw', 'dl', 'ds', 'section', 'align', 'reseed']]]
         },
         {
             type: TokenType.region,
@@ -94,7 +94,7 @@ export default class Lexer {
         },
         {
             type: TokenType.function,
-            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low', 'int', 'dec', 'hex', 'oct', 'bin', 'strrpl', 'sizeof', 'strpad']]],
+            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low', 'int', 'dec', 'hex', 'oct', 'bin', 'strrpl', 'sizeof', 'strpad', 'randint', 'randbyte', 'randword', 'randlong']]],
             end: [MatchType.one, ['(']],
             endLookahead: true
         },
