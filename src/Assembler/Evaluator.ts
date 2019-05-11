@@ -533,16 +533,31 @@ export default class Evaluator {
                 return
             }
             state.sections = state.sections ? state.sections : {}
-            state.sections[id] = {
-                id,
-                file: state.file,
-                bytes: [],
-                startLine: lineNumber,
-                region: regionOp.token.value.toLowerCase(),
-                fixedAddress: (regionOp.children.length ? this.calcConstExpr(regionOp.children[0], 'number', ctx) : undefined),
-                bank: (bankOp ? this.calcConstExpr(bankOp.children[0], 'number', ctx) : undefined),
-                alignment: (alignOp ? this.calcConstExpr(alignOp.children[0], 'number', ctx) : undefined)
+
+            const region = regionOp.token.value.toLowerCase()
+            const fixedAddress = (regionOp.children.length ? this.calcConstExpr(regionOp.children[0], 'number', ctx) : undefined)
+            const bank = (bankOp ? this.calcConstExpr(bankOp.children[0], 'number', ctx) : undefined)
+            const alignment = (alignOp ? this.calcConstExpr(alignOp.children[0], 'number', ctx) : undefined)
+
+            if (state.sections[id]) {
+                const other = state.sections[id]
+                if (other.region !== region || other.fixedAddress !== fixedAddress || other.bank !== bank || other.alignment !== alignment) {
+                    this.error('Section definition conflicts with an previously defined section', op.token, ctx)
+                    return
+                }
+            } else {
+                state.sections[id] = {
+                    id,
+                    file: state.file,
+                    bytes: [],
+                    startLine: lineNumber,
+                    region,
+                    fixedAddress,
+                    bank,
+                    alignment
+                }
             }
+
             state.inSections = state.inSections ? state.inSections : []
             state.inSections.unshift(id)
         },
