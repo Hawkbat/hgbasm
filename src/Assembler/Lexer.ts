@@ -94,7 +94,9 @@ export default class Lexer {
         },
         {
             type: TokenType.function,
-            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low']]]
+            rules: [[MatchType.one, ['mul', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'strcat', 'strcmp', 'strin', 'strlen', 'strlwr', 'strsub', 'strupr', 'bank', 'def', 'high', 'low', 'int', 'dec', 'hex', 'oct', 'bin', 'strrpl', 'sizeof']]],
+            end: [MatchType.one, ['(']],
+            endLookahead: true
         },
         {
             type: TokenType.opcode,
@@ -323,6 +325,13 @@ export default class Lexer {
         if (rule.startOfLine !== undefined && rule.startOfLine !== (index === 0)) {
             return undefined
         }
+        if (rule.start) {
+            const result = this.lexRule(index + len, rule.start, ctx)
+            if (result === undefined) {
+                return undefined
+            }
+            len += result
+        }
         if (rule.rules) {
             for (const subRule of rule.rules) {
                 const result = this.lexRule(index + len, subRule, ctx)
@@ -331,14 +340,16 @@ export default class Lexer {
                 }
                 len += result
             }
-        } else {
-            if (rule.start) {
-                const result = this.lexRule(index + len, rule.start, ctx)
+            if (rule.end) {
+                const result = this.lexRule(index + len, rule.end, ctx)
                 if (result === undefined) {
                     return undefined
                 }
-                len += result
+                if (!rule.endLookahead) {
+                    len += result
+                }
             }
+        } else {
             while (index + len < ctx.line.text.length) {
                 if (rule.end) {
                     const result = this.lexRule(index + len, rule.end, ctx)
