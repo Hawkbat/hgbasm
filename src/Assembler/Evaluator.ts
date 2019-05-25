@@ -1907,6 +1907,9 @@ export default class Evaluator {
             if (func === 'sizeof' && this.isConstExpr(op.children[1], ctx) && this.getConstExprType(op.children[1]) === 'string') {
                 return false
             }
+            if (func === 'def') {
+                return true
+            }
             for (const child of op.children.slice(1)) {
                 if (!this.isConstExpr(child, ctx)) {
                     return false
