@@ -1,12 +1,12 @@
 import Diagnostic from '../Diagnostic'
 import IFileProvider from '../IFileProvider'
+import IPatch from '../IPatch'
 import IObjectFile from '../Linker/IObjectFile'
 import RandGen from '../RandGen'
 import Assembler from './Assembler'
 import AssemblerMode from './AssemblerMode'
 import FileContext from './FileContext'
 import IAssemblerOptions from './IAssemblerOptions'
-import IPatch from '../IPatch'
 
 export default class AssemblerContext {
     public assembler: Assembler

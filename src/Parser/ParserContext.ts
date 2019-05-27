@@ -1,6 +1,6 @@
+import LineContext from '../Assembler/LineContext'
 import Diagnostic from '../Diagnostic'
 import ILineState from '../LineState/ILineState'
-import LineContext from '../Assembler/LineContext'
 import Node from '../Node'
 import Token from '../Token'
 

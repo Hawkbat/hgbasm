@@ -1,5 +1,5 @@
-import Node from '../Node'
 import ILineState from '../LineState/ILineState'
+import Node from '../Node'
 import Evaluator from './Evaluator'
 import EvaluatorContext from './EvaluatorContext'
 

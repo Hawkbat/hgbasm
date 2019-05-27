@@ -1,6 +1,6 @@
 import FileContext from '../Assembler/FileContext'
-import NodeType from '../NodeType'
 import PatchType from '../Linker/PatchType'
+import NodeType from '../NodeType'
 import DirectiveRules from './DirectiveRules'
 import EvaluatorRule from './EvaluatorRule'
 import KeywordRules from './KeywordRules'

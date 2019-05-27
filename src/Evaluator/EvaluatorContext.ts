@@ -1,9 +1,9 @@
-import Diagnostic from '../Diagnostic'
-import ILineMeta from '../LineState/ILineMeta'
-import ILineState from '../LineState/ILineState'
 import AssemblerContext from '../Assembler/AssemblerContext'
 import IAssemblerOptions from '../Assembler/IAssemblerOptions'
 import LineContext from '../Assembler/LineContext'
+import Diagnostic from '../Diagnostic'
+import ILineMeta from '../LineState/ILineMeta'
+import ILineState from '../LineState/ILineState'
 
 export default class EvaluatorContext {
     public context: AssemblerContext

@@ -1,7 +1,7 @@
 import Node from '../Node'
+import Token from '../Token'
 import Parser from './Parser'
 import ParserContext from './ParserContext'
-import Token from '../Token'
 
 type PrefixNodeRule = (token: Token, ctx: ParserContext, parser: Parser) => Node
 
