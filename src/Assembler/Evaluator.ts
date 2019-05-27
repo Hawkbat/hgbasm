@@ -52,6 +52,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'number', ctx)
             }
+            ctx.meta.equ = labelId
             this.logger.log('defineSymbol', 'Define number equate', labelId, 'as', state.numberEquates[labelId].toString(), '\n')
         },
         equs: (state, op, label, ctx) => {
@@ -76,6 +77,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'string', ctx)
             }
+            ctx.meta.equs = labelId
             this.logger.log('defineSymbol', 'Define string equate', labelId, 'as', state.stringEquates[labelId].value, '\n')
         },
         set: (state, op, label, ctx) => {
@@ -92,6 +94,7 @@ export default class Evaluator {
                 section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: this.calcConstExpr(op.children[0], 'number', ctx)
             }
+            ctx.meta.set = labelId
             this.logger.log('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString(), '\n')
         },
         charmap: (state, op, _, ctx) => {
@@ -150,6 +153,7 @@ export default class Evaluator {
                 file: state.file,
                 line: lineNumber
             })
+            ctx.meta.macro = labelId
         },
         endm: (state, op, _, ctx) => {
             const lineNumber = ctx.line.lineNumber
@@ -560,6 +564,8 @@ export default class Evaluator {
 
             state.inSections = state.inSections ? state.inSections : []
             state.inSections.unshift(id)
+
+            ctx.meta.section = id
         },
         pushs: (state) => {
             state.inSections = state.inSections ? state.inSections : []
@@ -874,6 +880,9 @@ export default class Evaluator {
                         bytes.push(0x00)
                     }
                     state.sections[sectionId].bytes.push(...bytes)
+
+                    ctx.meta.op = op.token.value.toLowerCase()
+                    ctx.meta.variant = rule.indexOf(variant)
                     return
                 }
             }
@@ -1765,8 +1774,8 @@ export default class Evaluator {
             await this.evaluateLine(ctx.state, ctx.line, ctx)
         }
 
-        ctx.inSection = ctx.state.inSections && ctx.state.inSections.length ? ctx.state.inSections[0] : ''
-        ctx.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
+        ctx.meta.inSection = ctx.state.inSections && ctx.state.inSections.length ? ctx.state.inSections[0] : ''
+        ctx.meta.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
 
         ctx.line.eval = ctx
 
@@ -2140,6 +2149,8 @@ export default class Evaluator {
             exported: exported || ctx.options.exportAllLabels
         }
         state.inLabel = local ? state.inLabel : labelId
+
+        ctx.meta.label = labelId
     }
 
     public applySourceReplace(source: string, regex: RegExp, value: string): string {

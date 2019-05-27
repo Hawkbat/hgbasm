@@ -1,4 +1,5 @@
 import Diagnostic from '../Diagnostic'
+import ILineMeta from '../LineState/ILineMeta'
 import ILineState from '../LineState/ILineState'
 import AssemblerContext from './AssemblerContext'
 import IAssemblerOptions from './IAssemblerOptions'
@@ -9,10 +10,8 @@ export default class EvaluatorContext {
     public line: LineContext
     public diagnostics: Diagnostic[]
     public state: ILineState
+    public meta: ILineMeta
     public options: IAssemblerOptions
-
-    public inSection: string = ''
-    public inLabel: string = ''
 
     constructor(context: AssemblerContext, line: LineContext, diagnostics: Diagnostic[], state: ILineState) {
         this.context = context
@@ -21,6 +20,7 @@ export default class EvaluatorContext {
         this.state = state ? state : { line: 0, file: '' }
         this.state.line = line.lineNumber
         this.state.file = line.file.source.path
+        this.meta = {}
         this.options = context.options
     }
 }

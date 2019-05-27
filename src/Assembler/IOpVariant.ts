@@ -10,6 +10,16 @@ export default interface IOpVariant {
         '[n8]' | '[n16]' |
         'sp+e8' | '[$FF00+c]' | '[$FF00+n8]'
     )[]
-    opcode: number,
+    opcode: number
     prefix?: number
+    bytes: number
+    cycles: number
+    conditionalCycles?: number
+    desc: string
+    flags?: {
+        z?: string
+        n?: string
+        h?: string
+        c?: string
+    }
 }
