@@ -1,15 +1,15 @@
+import LineContext from '../Assembler/LineContext'
 import Diagnostic from '../Diagnostic'
 import ILineState from '../LineState/ILineState'
-import LineContext from './LineContext'
-import Node from './Node'
-import Token from './Token'
+import Token from '../Token'
+import TokenType from '../TokenType'
 
-export default class ParserContext {
+export default class LexerContext {
     public line: LineContext
     public diagnostics: Diagnostic[]
-    public tokens: Token[] = []
     public state: ILineState
-    public node?: Node
+    public tokens: Token[] = []
+    public inType?: TokenType
 
     constructor(line: LineContext, diagnostics: Diagnostic[], state: ILineState) {
         this.line = line

@@ -1,8 +1,8 @@
 import AsmLine from '../AsmLine'
-import EvaluatorContext from './EvaluatorContext'
+import EvaluatorContext from '../Evaluator/EvaluatorContext'
+import LexerContext from '../Lexer/LexerContext'
+import ParserContext from '../Parser/ParserContext'
 import FileContext from './FileContext'
-import LexerContext from './LexerContext'
-import ParserContext from './ParserContext'
 
 export default class LineContext {
     public file: FileContext

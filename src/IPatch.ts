@@ -1,4 +1,4 @@
-import PatchType from '../Linker/PatchType'
+import PatchType from './Linker/PatchType'
 import Node from './Node'
 
 export default interface IPatch {

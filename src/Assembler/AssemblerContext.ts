@@ -6,7 +6,7 @@ import Assembler from './Assembler'
 import AssemblerMode from './AssemblerMode'
 import FileContext from './FileContext'
 import IAssemblerOptions from './IAssemblerOptions'
-import IPatch from './IPatch'
+import IPatch from '../IPatch'
 
 export default class AssemblerContext {
     public assembler: Assembler

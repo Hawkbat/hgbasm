@@ -1,6 +1,6 @@
 import LineContext from './Assembler/LineContext'
-import Token from './Assembler/Token'
-import TokenType from './Assembler/TokenType'
+import Token from './Token'
+import TokenType from './TokenType'
 
 export default class Diagnostic {
     constructor(

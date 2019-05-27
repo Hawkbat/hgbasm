@@ -3936,7 +3936,7 @@ const OpRules: { [key: string]: IOpVariant[] } = {
             opcode: 0x11,
             bytes: 3,
             cycles: 3,
-            desc: 'bc = n16'
+            desc: 'de = n16'
         },
         {
             args: ['hl', 'sp+e8'],
@@ -3956,7 +3956,7 @@ const OpRules: { [key: string]: IOpVariant[] } = {
             opcode: 0x21,
             bytes: 3,
             cycles: 3,
-            desc: 'bc = n16'
+            desc: 'hl = n16'
         },
         {
             args: ['sp', 'hl'],
