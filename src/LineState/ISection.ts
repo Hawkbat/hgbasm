@@ -1,8 +1,6 @@
+import ISymbol from './ISymbol'
 
-export default interface ISection {
-    id: string
-    file: string
-    startLine: number
+export default interface ISection extends ISymbol {
     region: string
     bytes: number[]
     fixedAddress?: number

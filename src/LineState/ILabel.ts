@@ -1,8 +1,6 @@
+import ISymbol from './ISymbol'
 
-export default interface ILabel {
-    id: string
-    file: string
-    line: number
+export default interface ILabel extends ISymbol {
     section: string
     byteOffset: number
     exported: boolean

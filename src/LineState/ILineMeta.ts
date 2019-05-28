@@ -1,6 +1,7 @@
 
 export default interface ILineMeta {
     inSection?: string
+    inGlobalLabel?: string
     inLabel?: string
 
     section?: string

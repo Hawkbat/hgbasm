@@ -1,8 +1,5 @@
+import ISymbol from './ISymbol'
 
-export default interface IStringEquate {
-    id: string
-    file: string
-    line: number
-    section: string
+export default interface IStringEquate extends ISymbol {
     value: string
 }

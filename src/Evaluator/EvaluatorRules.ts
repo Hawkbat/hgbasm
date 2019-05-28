@@ -27,9 +27,9 @@ const EvaluatorRules: { [key: number]: EvaluatorRule } = {
             state.sets = state.sets ? state.sets : {}
             state.sets[labelId] = {
                 id: labelId,
-                line: state.line,
+                startLine: state.line,
+                endLine: state.line,
                 file: state.file,
-                section: state.inSections && state.inSections.length ? state.inSections[0] : '',
                 value: e.calcConstExpr(op.children[0], 'number', ctx)
             }
         } else {

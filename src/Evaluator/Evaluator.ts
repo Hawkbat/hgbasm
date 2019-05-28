@@ -48,7 +48,18 @@ export default class Evaluator {
         }
 
         ctx.meta.inSection = ctx.state.inSections && ctx.state.inSections.length ? ctx.state.inSections[0] : ''
+        ctx.meta.inGlobalLabel = ctx.state.inGlobalLabel ? ctx.state.inGlobalLabel : ''
         ctx.meta.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
+
+        if (ctx.meta.inSection && ctx.state.sections) {
+            ctx.state.sections[ctx.meta.inSection].endLine = ctx.line.lineNumber
+        }
+        if (ctx.meta.inGlobalLabel && ctx.state.labels) {
+            ctx.state.labels[ctx.meta.inGlobalLabel].endLine = ctx.line.lineNumber
+        }
+        if (ctx.meta.inLabel && ctx.state.labels) {
+            ctx.state.labels[ctx.meta.inLabel].endLine = ctx.line.lineNumber
+        }
 
         ctx.line.eval = ctx
 
@@ -251,7 +262,7 @@ export default class Evaluator {
                     } else if (op.children[1].type === NodeType.identifier) {
                         let id = op.children[1].token.value
                         if (id.startsWith('.')) {
-                            id = ctx.state.inLabel + id
+                            id = ctx.state.inGlobalLabel + id
                         }
                         const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
                         if (symbol) {
@@ -299,7 +310,7 @@ export default class Evaluator {
                     } else if (op.children[1].type === NodeType.identifier) {
                         let id = op.children[1].token.value
                         if (id.startsWith('.')) {
-                            id = ctx.state.inLabel + id
+                            id = ctx.state.inGlobalLabel + id
                         }
                         const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
                         if (symbol) {
@@ -338,7 +349,7 @@ export default class Evaluator {
             case NodeType.identifier: {
                 let id = op.token.value
                 if (id.startsWith('.')) {
-                    id = ctx.state.inLabel + id
+                    id = ctx.state.inGlobalLabel + id
                 }
                 if (ctx.state.numberEquates && ctx.state.numberEquates[id]) {
                     bs.writeByte(ExprType.immediate_int)
@@ -390,10 +401,10 @@ export default class Evaluator {
         const local = label.token.value.indexOf('.') >= 0
         let labelId = label.token.value.replace(':', '').replace(':', '')
         if (local) {
-            if (state.inLabel) {
+            if (state.inGlobalLabel) {
                 if (labelId.startsWith('.')) {
-                    labelId = state.inLabel + labelId
-                } else if (labelId.substr(0, labelId.indexOf('.')) !== state.inLabel) {
+                    labelId = state.inGlobalLabel + labelId
+                } else if (labelId.substr(0, labelId.indexOf('.')) !== state.inGlobalLabel) {
                     this.error('Local label defined within wrong global label', label.token, ctx)
                     return
                 }
@@ -415,13 +426,15 @@ export default class Evaluator {
         state.labels = state.labels ? state.labels : {}
         state.labels[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: ctx.context.file.source.path,
             section: state.inSections[0],
             byteOffset: state.sections[state.inSections[0]].bytes.length,
             exported: exported || ctx.options.exportAllLabels
         }
-        state.inLabel = local ? state.inLabel : labelId
+        state.inGlobalLabel = local ? state.inGlobalLabel : labelId
+        state.inLabel = labelId
 
         ctx.meta.label = labelId
     }

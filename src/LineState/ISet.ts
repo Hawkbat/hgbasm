@@ -1,8 +1,5 @@
+import ISymbol from './ISymbol'
 
-export default interface ISet {
-    id: string
-    file: string
-    line: number
-    section: string
+export default interface ISet extends ISymbol {
     value: number
 }

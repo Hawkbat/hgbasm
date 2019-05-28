@@ -37,9 +37,9 @@ export default class Assembler {
             state.stringEquates = state.stringEquates ? state.stringEquates : {}
             state.stringEquates[ctx.options.debugDefineName] = {
                 id: ctx.options.debugDefineName,
-                line: 0,
+                startLine: 0,
+                endLine: 0,
                 file: ctx.file.source.path,
-                section: '',
                 value: ctx.options.debugDefineValue
             }
         }
@@ -86,7 +86,7 @@ export default class Assembler {
                 if (symbol) {
                     symbol.name = v.id
                     symbol.file = v.file
-                    symbol.line = v.line
+                    symbol.line = v.startLine
                     symbol.type = v.exported ? SymbolType.Exported : SymbolType.Internal
                     symbol.sectionId = sectionKeys.indexOf(v.section)
                     symbol.value = v.byteOffset
@@ -95,7 +95,7 @@ export default class Assembler {
                         id: ctx.objectFile.symbols.length,
                         name: v.id,
                         file: v.file,
-                        line: v.line,
+                        line: v.startLine,
                         type: v.exported ? SymbolType.Exported : SymbolType.Internal,
                         sectionId: sectionKeys.indexOf(v.section),
                         value: v.byteOffset

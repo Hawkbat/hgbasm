@@ -30,5 +30,6 @@ export default interface ILineState {
     options?: IOptions[]
     rsCounter?: number
     macroCounter?: number
+    inGlobalLabel?: string
     inLabel?: string
 }

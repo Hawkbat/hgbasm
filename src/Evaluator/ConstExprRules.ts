@@ -323,7 +323,7 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
         return e.calcConstExpr(op.children[0], 'number', ctx)
     },
     [NodeType.identifier]: (op, ctx, e) => {
-        const id = op.token.value.startsWith('.') ? ctx.state.inLabel + op.token.value : op.token.value
+        const id = op.token.value.startsWith('.') ? ctx.state.inGlobalLabel + op.token.value : op.token.value
         if (PredefineRules[id]) {
             return PredefineRules[id](op, ctx, e)
         }

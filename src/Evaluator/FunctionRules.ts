@@ -277,7 +277,7 @@ const FunctionRules: { [key: string]: IFunctionRule } = {
         return: { type: 'number', desc: 'The bank number' },
         desc: 'Calculates the bank of the current section (@), a specified section, or a label',
         rule: (op, ctx, e) => {
-            const id = `${op.children[1].token.value.startsWith('.') ? ctx.state.inLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
+            const id = `${op.children[1].token.value.startsWith('.') ? ctx.state.inGlobalLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
             if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
                 return ctx.state.numberEquates[id].value
             } else {

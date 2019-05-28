@@ -16,9 +16,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.numberEquates = state.numberEquates ? state.numberEquates : {}
         state.numberEquates[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: e.calcConstExpr(op.children[0], 'number', ctx)
         }
         ctx.meta.equ = labelId
@@ -41,9 +41,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.stringEquates = state.stringEquates ? state.stringEquates : {}
         state.stringEquates[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: e.calcConstExpr(op.children[0], 'string', ctx)
         }
         ctx.meta.equs = labelId
@@ -58,9 +58,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: e.calcConstExpr(op.children[0], 'number', ctx)
         }
         ctx.meta.set = labelId
@@ -120,7 +120,8 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.inMacroDefines.unshift({
             id: labelId,
             file: state.file,
-            line: lineNumber
+            startLine: lineNumber,
+            endLine: lineNumber
         })
         ctx.meta.macro = labelId
     },
@@ -136,7 +137,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             state.macros[define.id] = {
                 id: define.id,
                 file: define.file,
-                startLine: define.line,
+                startLine: define.startLine,
                 endLine: lineNumber
             }
 
@@ -251,9 +252,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: state.rsCounter ? state.rsCounter : 0
         }
         state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx)
@@ -268,9 +269,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: state.rsCounter ? state.rsCounter : 0
         }
         state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 2
@@ -285,9 +286,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
-            line: state.line,
+            startLine: state.line,
+            endLine: state.line,
             file: state.file,
-            section: state.inSections && state.inSections.length ? state.inSections[0] : '',
             value: state.rsCounter ? state.rsCounter : 0
         }
         state.rsCounter = (state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 4
@@ -524,6 +525,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
                 file: state.file,
                 bytes: [],
                 startLine: lineNumber,
+                endLine: lineNumber,
                 region,
                 fixedAddress,
                 bank,

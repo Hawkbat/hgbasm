@@ -1,7 +1,5 @@
+import ISymbol from './ISymbol'
 
-export default interface IMacro {
-    id: string
-    file: string
-    startLine: number
-    endLine: number
+export default interface IMacro extends ISymbol {
+
 }
