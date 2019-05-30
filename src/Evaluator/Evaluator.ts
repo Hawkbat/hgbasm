@@ -52,13 +52,19 @@ export default class Evaluator {
         ctx.meta.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
 
         if (ctx.meta.inSection && ctx.state.sections) {
-            ctx.state.sections[ctx.meta.inSection].endLine = ctx.line.lineNumber
-        }
-        if (ctx.meta.inGlobalLabel && ctx.state.labels) {
-            ctx.state.labels[ctx.meta.inGlobalLabel].endLine = ctx.line.lineNumber
-        }
-        if (ctx.meta.inLabel && ctx.state.labels) {
-            ctx.state.labels[ctx.meta.inLabel].endLine = ctx.line.lineNumber
+            const section = ctx.state.sections[ctx.meta.inSection]
+            section.endLine = ctx.line.lineNumber
+
+            if (ctx.meta.inGlobalLabel && ctx.state.labels) {
+                const label = ctx.state.labels[ctx.meta.inGlobalLabel]
+                label.endLine = ctx.line.lineNumber
+                label.byteSize = section.bytes.length - label.byteOffset
+            }
+            if (ctx.meta.inLabel && ctx.state.labels) {
+                const label = ctx.state.labels[ctx.meta.inLabel]
+                label.endLine = ctx.line.lineNumber
+                label.byteSize = section.bytes.length - label.byteOffset
+            }
         }
 
         ctx.line.eval = ctx
@@ -431,6 +437,7 @@ export default class Evaluator {
             file: ctx.context.file.source.path,
             section: state.inSections[0],
             byteOffset: state.sections[state.inSections[0]].bytes.length,
+            byteSize: 0,
             exported: exported || ctx.options.exportAllLabels
         }
         state.inGlobalLabel = local ? state.inGlobalLabel : labelId
