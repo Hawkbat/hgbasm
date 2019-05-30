@@ -49,8 +49,12 @@ export default class Fixer {
         if (opts.mbcType !== undefined) {
             data[0x0147] = opts.mbcType & 0xFF
         }
-        if (opts.padding !== undefined) {
-            data[0x0148] = romSizePadFactor & 0xFF
+        if (opts.romSize !== undefined) {
+            if (typeof opts.romSize === 'number') {
+                data[0x0148] = opts.romSize & 0xFF
+            } else if (opts.romSize === 'auto') {
+                data[0x0148] = romSizePadFactor & 0xFF
+            }
         }
         if (opts.ramSize !== undefined) {
             data[0x0149] = opts.ramSize & 0xFF
@@ -60,6 +64,8 @@ export default class Fixer {
         }
         if (opts.licenseeCode !== undefined) {
             data[0x014B] = opts.licenseeCode & 0xFF
+        } else if (opts.licensee !== undefined) {
+            data[0x014B] = 0x33
         }
         if (opts.gameVersion !== undefined) {
             data[0x014C] = opts.gameVersion & 0xFF
