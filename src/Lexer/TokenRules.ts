@@ -1,4 +1,6 @@
 import FunctionRules from '../Evaluator/FunctionRules'
+import KeywordRules from '../Evaluator/KeywordRules'
+import OpRules from '../Evaluator/OpRules'
 import TokenType from '../TokenType'
 import ITokenRule from './ITokenRule'
 import MatchType from './MatchType'
@@ -66,7 +68,7 @@ const TokenRules: ITokenRule[] = [
     },
     {
         type: TokenType.keyword,
-        rules: [[MatchType.one, ['include', 'incbin', 'export', 'global', 'union', 'nextu', 'endu', 'printt', 'printv', 'printi', 'printf', 'fail', 'warn', 'if', 'elif', 'else', 'endc', 'purge', 'rept', 'endr', 'opt', 'popo', 'pusho', 'pops', 'pushs', 'equ', 'set', 'equs', 'macro', 'endm', 'shift', 'charmap', 'rsreset', 'rsset', 'rb', 'rw', 'rl', 'db', 'dw', 'dl', 'ds', 'section', 'bank', 'align', 'reseed']]]
+        rules: [[MatchType.one, Object.keys(KeywordRules)]]
     },
     {
         type: TokenType.region,
@@ -74,7 +76,7 @@ const TokenRules: ITokenRule[] = [
     },
     {
         type: TokenType.opcode,
-        rules: [[MatchType.one, ['adc', 'add', 'and', 'bit', 'call', 'ccf', 'cp', 'cpl', 'daa', 'dec', 'di', 'ei', 'halt', 'inc', 'jp', 'jr', 'ld', 'ldh', 'ldi', 'ldd', 'ldhl', 'nop', 'or', 'pop', 'push', 'res', 'ret', 'reti', 'rl', 'rla', 'rlc', 'rlca', 'rr', 'rra', 'rrc', 'rrca', 'rst', 'sbc', 'scf', 'sla', 'sra', 'srl', 'stop', 'sub', 'swap', 'xor']]]
+        rules: [[MatchType.one, Object.keys(OpRules)]]
     },
     {
         type: TokenType.register,
