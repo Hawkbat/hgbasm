@@ -30,6 +30,7 @@ const FormatRules: { [key: number]: FormatRule } = {
         const first = n.children[0]
         const indent = first.type === NodeType.opcode ||
             first.type === NodeType.macro_call ||
+            (first.type === NodeType.comment && first.token.col > 0) ||
             (first.type === NodeType.keyword && PSEUDO_OPS.includes(first.token.value.toLowerCase()))
         return `${indent ? f.indent(ctx) : ''}${f.formatNode(first, ctx)}${n.children.slice(1).map((c) => ` ${f.formatNode(c, ctx)}`).join('')}`
     },
