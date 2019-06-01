@@ -1,6 +1,7 @@
 import FileContext from '../Assembler/FileContext'
 import LineContext from '../Assembler/LineContext'
 import Diagnostic from '../Diagnostic'
+import IDelta from './IDelta'
 import IFormatterOptions from './IFormatterOptions'
 
 export default class FormatterContext {

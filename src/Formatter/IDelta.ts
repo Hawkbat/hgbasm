@@ -1,5 +1,5 @@
 
-interface IDelta {
+export default interface IDelta {
     line: number
     column: number
     add: string
