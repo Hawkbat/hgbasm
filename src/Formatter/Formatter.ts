@@ -35,7 +35,7 @@ export default class Formatter {
                             remove: d.removed ? d.value.length : 0
                         })
                     }
-                    if (!d.removed) {
+                    if (!d.added) {
                         col += d.value.length
                     }
                 }
