@@ -17,8 +17,11 @@
     "url": "https://github.com/Hawkbat/hgbasm/issues"
   },
   "homepage": "https://github.com/Hawkbat/hgbasm#readme",
-  "dependencies": {},
+  "dependencies": {
+    "diff": "^4.0.1"
+  },
   "devDependencies": {
+    "@types/diff": "^4.0.2",
     "typescript": "^3.2.4"
   }
 }
