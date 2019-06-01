@@ -1,6 +1,7 @@
 import MBCType from './Fixer/MBCType'
 import RAMSize from './Fixer/RAMSize'
 import ROMSize from './Fixer/ROMSize'
+import CasingStyle from './Formatter/CasingStyle'
 import { LogLevel } from './Logger'
 
 export default interface IProjectFile {
@@ -61,6 +62,20 @@ export default interface IProjectFile {
             gameId?: string
             gameTitle?: string
             gameVersion?: number
+        }
+    }
+    formatter?: {
+        settings?: {
+            useSpaces?: boolean
+            tabSize?: number
+            keywordCase?: CasingStyle
+            opcodeCase?: CasingStyle
+            psuedoOpCase?: CasingStyle
+            conditionCodeCase?: CasingStyle
+            registerCase?: CasingStyle
+            functionCase?: CasingStyle
+            regionCase?: CasingStyle
+            hexLetterCase?: CasingStyle
         }
     }
     emulator?: {
