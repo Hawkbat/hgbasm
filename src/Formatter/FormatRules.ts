@@ -35,7 +35,13 @@ const FormatRules: { [key: number]: FormatRule } = {
     },
     [NodeType.macro_call]: (n, ctx, f) => `${n.token.value}${n.children.map((c) => f.formatNode(c, ctx)).join(',')}`,
     [NodeType.number_literal]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.hexLetterCase),
-    [NodeType.opcode]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.opcodeCase),
+    [NodeType.opcode]: (n, ctx, f) => {
+        let str = f.capitalize(n.token.value, ctx.options.opcodeCase)
+        if (n.children.length) {
+            str += ` ${n.children.map((c) => f.formatNode(c, ctx)).join(', ')}`
+        }
+        return str
+    },
     [NodeType.region]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.regionCase),
     [NodeType.register]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.registerCase),
     [NodeType.string]: (n) => n.token.value,
