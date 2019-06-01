@@ -10,7 +10,13 @@ const FormatRules: { [key: number]: FormatRule } = {
     [NodeType.directive]: (n) => n.token.value,
     [NodeType.function]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.functionCase),
     [NodeType.function_call]: (n, ctx, f) => `${f.formatNode(n.children[0], ctx)}(${n.children.slice(1).map((c) => f.formatNode(c, ctx)).join(', ')})`,
-    [NodeType.identifier]: (n) => n.token.value,
+    [NodeType.identifier]: (n, ctx, f) => {
+        const id = n.token.value.toLowerCase()
+        if (id === 'align' || id === 'bank') {
+            return `${f.capitalize(id, ctx.options.keywordCase)}${n.children.length ? f.formatNode(n.children[0], ctx) : ''}`
+        }
+        return n.token.value
+    },
     [NodeType.indexer]: (n, ctx, f) => `[${f.formatNode(n.children[0], ctx)}]`,
     [NodeType.keyword]: (n, ctx, f) => {
         const id = n.token.value.toLowerCase()
