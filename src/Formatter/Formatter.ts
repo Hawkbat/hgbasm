@@ -14,7 +14,7 @@ export default class Formatter {
         this.logger = logger
     }
 
-    public async format(ctx: FormatterContext): Promise<FormatterContext> {
+    public format(ctx: FormatterContext): FormatterContext {
         for (let i = ctx.startLine; i <= ctx.endLine; i++) {
             const line = ctx.file.lines[i]
             ctx.line = line

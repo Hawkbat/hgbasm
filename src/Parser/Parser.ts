@@ -17,7 +17,7 @@ export default class Parser {
         this.logger = logger
     }
 
-    public async parse(ctx: ParserContext): Promise<ParserContext> {
+    public parse(ctx: ParserContext): ParserContext {
         if (ctx.line.lex) {
             const checkMacro =
                 ctx.state.inMacroDefines &&

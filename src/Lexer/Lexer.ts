@@ -17,7 +17,7 @@ export default class Lexer {
         this.logger = logger
     }
 
-    public async lex(ctx: LexerContext): Promise<LexerContext> {
+    public lex(ctx: LexerContext): LexerContext {
 
         ctx.line.text = ctx.line.source.text
 
