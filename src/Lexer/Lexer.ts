@@ -162,20 +162,15 @@ export default class Lexer {
         }
         let len = 0
         let count = 0
+        const line = ctx.line.text.toLowerCase()
         while (count < max) {
-            let nextLen = 0
-            let matched = false
-            for (const pattern of patterns) {
-                if (ctx.line.text.toLowerCase().substr(index + len, pattern.length) === pattern) {
-                    nextLen = Math.max(nextLen, pattern.length)
-                    matched = true
-                }
-            }
-            if (!matched) {
+            const match = patterns.find((p) => line.substr(index + len, p.length) === p)
+            if (match) {
+                count++
+                len += match.length
+            } else {
                 break
             }
-            count++
-            len += nextLen
         }
         return count >= min ? len : undefined
     }

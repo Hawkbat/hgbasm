@@ -5,6 +5,10 @@ import TokenType from '../TokenType'
 import ITokenRule from './ITokenRule'
 import MatchType from './MatchType'
 
+function lexOrder(a: string, b: string): number {
+    return a.length !== b.length ? Math.sign(b.length - a.length) : a.localeCompare(b)
+}
+
 const TokenRules: ITokenRule[] = [
     {
         type: TokenType.semicolon_comment,
@@ -62,29 +66,29 @@ const TokenRules: ITokenRule[] = [
     },
     {
         type: TokenType.function,
-        rules: [[MatchType.one, Object.keys(FunctionRules)]],
+        rules: [[MatchType.one, Object.keys(FunctionRules).sort(lexOrder)]],
         end: [MatchType.one, ['(']],
         endLookahead: true
     },
     {
         type: TokenType.keyword,
-        rules: [[MatchType.one, Object.keys(KeywordRules)]]
+        rules: [[MatchType.one, Object.keys(KeywordRules).sort(lexOrder)]]
     },
     {
         type: TokenType.region,
-        rules: [[MatchType.one, ['rom0', 'romx', 'vram', 'sram', 'wram0', 'wramx', 'oam', 'hram']]]
+        rules: [[MatchType.one, ['rom0', 'romx', 'vram', 'sram', 'wram0', 'wramx', 'oam', 'hram'].sort(lexOrder)]]
     },
     {
         type: TokenType.opcode,
-        rules: [[MatchType.one, Object.keys(OpRules)]]
+        rules: [[MatchType.one, Object.keys(OpRules).sort(lexOrder)]]
     },
     {
         type: TokenType.register,
-        rules: [[MatchType.one, ['a', 'f', 'b', 'c', 'd', 'e', 'h', 'l', 'af', 'bc', 'de', 'hl', 'hli', 'hld', 'hl+', 'hl-', 'sp', 'pc']]]
+        rules: [[MatchType.one, ['a', 'f', 'b', 'c', 'd', 'e', 'h', 'l', 'af', 'bc', 'de', 'hl', 'hli', 'hld', 'hl+', 'hl-', 'sp', 'pc'].sort(lexOrder)]]
     },
     {
         type: TokenType.condition,
-        rules: [[MatchType.one, ['z', 'nz', 'c', 'nc']]]
+        rules: [[MatchType.one, ['z', 'nz', 'c', 'nc'].sort(lexOrder)]]
     },
     {
         type: TokenType.identifier,
