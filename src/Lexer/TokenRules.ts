@@ -83,7 +83,7 @@ const TokenRules: ITokenRule[] = [
     },
     {
         type: TokenType.register,
-        rules: [[MatchType.one, ['a', 'f', 'b', 'c', 'd', 'e', 'h', 'l', 'af', 'bc', 'de', 'hl', 'hli', 'hld', 'hl+', 'hl-', 'sp', 'pc'].sort(lexOrder)]]
+        rules: [[MatchType.one, ['a', 'b', 'c', 'd', 'e', 'h', 'l', 'af', 'bc', 'de', 'hl', 'hli', 'hld', 'hl+', 'hl-', 'sp', 'pc'].sort(lexOrder)]]
     },
     {
         type: TokenType.condition,
