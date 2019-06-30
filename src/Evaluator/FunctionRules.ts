@@ -198,7 +198,7 @@ const FunctionRules: { [key: string]: IFunctionRule } = {
                 return a.localeCompare(b)
             } else {
                 e.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                return ''
+                return 0
             }
         }
     },
@@ -216,7 +216,7 @@ const FunctionRules: { [key: string]: IFunctionRule } = {
                 return a.indexOf(b) + 1
             } else {
                 e.error('Function needs exactly two arguments', op.children[0].token, ctx)
-                return ''
+                return 0
             }
         }
     },
