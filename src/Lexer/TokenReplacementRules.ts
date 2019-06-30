@@ -59,7 +59,7 @@ const TokenReplacementRules: { [key: number]: TokenReplacementRule } = {
         if (inType === undefined) {
             if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
                 if (token.value === '\\@') {
-                    token.value = `_${ctx.state.macroCounter}`
+                    lex.substituteToken(token, `_${ctx.state.macroCounter}`, ctx)
                 } else {
                     const macroCall = ctx.state.inMacroCalls[0]
                     const index = parseInt(token.value.substr(1), 10) + macroCall.argOffset
