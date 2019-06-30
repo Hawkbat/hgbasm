@@ -166,31 +166,40 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             file: state.file
         })
 
+        state.inMacroDefines = state.inMacroDefines ? state.inMacroDefines : []
+        state.inMacroDefines.unshift({
+            id: 'rept',
+            startLine: lineNumber,
+            endLine: -1,
+            file: state.file
+        })
+    },
+    endr: async (state, op, _, ctx, e) => {
+        const lineNumber = ctx.line.lineNumber
+        if (!state.inRepeats || !state.inRepeats.length || !state.inMacroDefines || !state.inMacroDefines.length) {
+            e.error('No matching rept to terminate', op.token, ctx)
+            return
+        }
+        state.inMacroDefines.shift()
+
+        const count = state.inRepeats[0].count
+        const startLine = state.inRepeats[0].line + 1
+        const endLine = lineNumber - 1
+
         state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
         state.inMacroCalls.unshift({
             id: 'rept',
             args: state.inMacroCalls.length ? state.inMacroCalls[0].args : [],
             argOffset: 0
         })
-
         state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
-    },
-    endr: async (state, op, _, ctx, e) => {
-        const lineNumber = ctx.line.lineNumber
-        if (!state.inRepeats || !state.inRepeats.length || !state.inMacroCalls || !state.inMacroCalls.length) {
-            e.error('No matching rept to terminate', op.token, ctx)
-            return
-        }
-        const count = state.inRepeats[0].count
-        const startLine = state.inRepeats[0].line + 1
-        const endLine = lineNumber - 1
 
-        for (let i = 1; i < count; i++) {
+        for (let i = 0; i < count; i++) {
             const file = new FileContext(ctx.line.file.source, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}) -> rept`, startLine, endLine)
             await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
         }
-        state.inRepeats.shift()
         state.inMacroCalls.shift()
+        state.inRepeats.shift()
     },
     union: (state, op, _, ctx, e) => {
         if (!state.sections || !state.inSections || !state.inSections.length || !state.inSections[0]) {

@@ -42,8 +42,12 @@ export default class Evaluator {
             !ctx.state.inConditionals.length ||
             ctx.state.inConditionals.every((cond) => cond.condition) ||
             (ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
+        const checkRepts =
+            !ctx.state.inRepeats ||
+            !ctx.state.inRepeats.length ||
+            (ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'endr'))
 
-        if (checkConditionals) {
+        if (checkConditionals && checkRepts) {
             await this.evaluateLine(ctx.state, ctx.line, ctx)
         }
 
