@@ -34,6 +34,24 @@ const TokenReplacementRules: { [key: number]: TokenReplacementRule } = {
             }
         }
     },
+    [TokenType.string_interpolation]: (token, inType, ctx, lex) => {
+        if (ctx.state.inMacroDefines && ctx.state.inMacroDefines.length) {
+            return
+        }
+        if (inType === undefined) {
+            const value = token.value.substr(1, token.value.length - 2)
+
+            if (ctx.state.sets && ctx.state.sets[value]) {
+                lex.substituteToken(token, `$${ctx.state.sets[value].value.toString(16).toUpperCase()}`, ctx)
+            } else if (ctx.state.numberEquates && ctx.state.numberEquates[value]) {
+                lex.substituteToken(token, `$${ctx.state.numberEquates[value].value.toString(16).toUpperCase()}`, ctx)
+            } else if (ctx.state.stringEquates && ctx.state.stringEquates[value]) {
+                lex.substituteToken(token, ctx.state.stringEquates[value].value, ctx)
+            } else {
+                lex.error('No matching symbol found to expand', token, ctx)
+            }
+        }
+    },
     [TokenType.macro_escape]: (token, inType, ctx, lex) => {
         if (ctx.state.inMacroDefines && ctx.state.inMacroDefines.length) {
             return
