@@ -21,7 +21,7 @@ const FormatRules: { [key: number]: FormatRule } = {
     [NodeType.keyword]: (n, ctx, f) => {
         const id = n.token.value.toLowerCase()
         let str = PSEUDO_OPS.includes(id) ?
-            f.capitalize(n.token.value, ctx.options.psuedoOpCase) :
+            f.capitalize(n.token.value, ctx.options.pseudoOpCase) :
             f.capitalize(n.token.value, ctx.options.keywordCase)
         if (n.children.length) {
             str += ` ${n.children.map((c) => f.formatNode(c, ctx)).join(', ')}`

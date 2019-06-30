@@ -70,7 +70,7 @@ export default interface IProjectFile {
             tabSize?: number
             keywordCase?: CasingStyle
             opcodeCase?: CasingStyle
-            psuedoOpCase?: CasingStyle
+            pseudoOpCase?: CasingStyle
             conditionCodeCase?: CasingStyle
             registerCase?: CasingStyle
             functionCase?: CasingStyle
