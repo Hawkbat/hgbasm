@@ -431,7 +431,7 @@ export default class Evaluator {
             this.error('Labels must be defined within a section', label.token, ctx)
             return
         }
-        this.logger.log('defineSymbol', 'Define label', labelId, '\n')
+        this.logger.logLine('defineSymbol', 'Define label', labelId)
 
         state.labels = state.labels ? state.labels : {}
         state.labels[labelId] = {

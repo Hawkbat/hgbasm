@@ -258,12 +258,12 @@ const EvaluatorRules: { [key: number]: EvaluatorRule } = {
             argOffset: 0
         })
         state.macroCounter = state.macroCounter ? state.macroCounter + 1 : 1
-        e.logger.log('enterScope', 'Enter macro call', op.token.value, args.join(', '), '\n')
+        e.logger.logLine('enterScope', 'Enter macro call', op.token.value, args.join(', '))
 
         const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}) -> ${macro.id}`, startLine, endLine)
         await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
 
-        e.logger.log('exitScope', 'Exit macro call', op.token.value, '\n')
+        e.logger.logLine('exitScope', 'Exit macro call', op.token.value)
 
         state.inMacroCalls.shift()
     }

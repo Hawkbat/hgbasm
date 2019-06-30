@@ -22,7 +22,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             value: e.calcConstExpr(op.children[0], 'number', ctx)
         }
         ctx.meta.equ = labelId
-        e.logger.log('defineSymbol', 'Define number equate', labelId, 'as', state.numberEquates[labelId].toString(), '\n')
+        e.logger.logLine('defineSymbol', 'Define number equate', labelId, 'as', state.numberEquates[labelId].toString())
     },
     equs: (state, op, label, ctx, e) => {
         const labelId = label ? label.token.value.replace(/:/g, '') : ''
@@ -47,7 +47,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             value: e.calcConstExpr(op.children[0], 'string', ctx)
         }
         ctx.meta.equs = labelId
-        e.logger.log('defineSymbol', 'Define string equate', labelId, 'as', state.stringEquates[labelId].value, '\n')
+        e.logger.logLine('defineSymbol', 'Define string equate', labelId, 'as', state.stringEquates[labelId].value)
     },
     set: (state, op, label, ctx, e) => {
         const labelId = label ? label.token.value.replace(/:/g, '') : ''
@@ -64,7 +64,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             value: e.calcConstExpr(op.children[0], 'number', ctx)
         }
         ctx.meta.set = labelId
-        e.logger.log('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString(), '\n')
+        e.logger.logLine('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString())
     },
     charmap: (state, op, _, ctx, e) => {
         if (op.children.length !== 2) {
@@ -141,7 +141,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
                 endLine: lineNumber
             }
 
-            e.logger.log('defineSymbol', 'Define macro', define.id, '\n')
+            e.logger.logLine('defineSymbol', 'Define macro', define.id)
         }
         state.inMacroDefines.shift()
     },
@@ -257,7 +257,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx)).toString(), '\n')
+        e.logger.logLine('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx)).toString())
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
@@ -274,7 +274,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 2).toString(), '\n')
+        e.logger.logLine('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 2).toString())
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
@@ -291,7 +291,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 4).toString(), '\n')
+        e.logger.logLine('defineSymbol', 'Define set', labelId, 'as', ((state.rsCounter ? state.rsCounter : 0) + e.calcConstExpr(op.children[0], 'number', ctx) * 4).toString())
         state.sets = state.sets ? state.sets : {}
         state.sets[labelId] = {
             id: labelId,
@@ -470,22 +470,22 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             let purged = false
             if (state.stringEquates && state.stringEquates[id]) {
                 delete state.stringEquates[id]
-                e.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
+                e.logger.logLine('purgeSymbol', 'Purge string equate', id)
                 purged = true
             }
             if (state.numberEquates && state.numberEquates[id]) {
                 delete state.numberEquates[id]
-                e.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
+                e.logger.logLine('purgeSymbol', 'Purge string equate', id)
                 purged = true
             }
             if (state.sets && state.sets[id]) {
                 delete state.sets[id]
-                e.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
+                e.logger.logLine('purgeSymbol', 'Purge string equate', id)
                 purged = true
             }
             if (state.macros && state.macros[id]) {
                 delete state.macros[id]
-                e.logger.log('purgeSymbol', 'Purge string equate', id, '\n')
+                e.logger.logLine('purgeSymbol', 'Purge string equate', id)
                 purged = true
             }
             if (!purged) {
@@ -612,28 +612,28 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('info', e.calcConstExpr(op.children[0], 'string', ctx), '\n')
+        e.logger.log('info', e.calcConstExpr(op.children[0], 'string', ctx))
     },
     printv: (_, op, __, ctx, e) => {
         if (op.children.length !== 1) {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('info', `$${(e.calcConstExpr(op.children[0], 'number', ctx) >>> 0).toString(16).toUpperCase()}`, '\n')
+        e.logger.log('info', `$${(e.calcConstExpr(op.children[0], 'number', ctx) >>> 0).toString(16).toUpperCase()}`)
     },
     printi: (_, op, __, ctx, e) => {
         if (op.children.length !== 1) {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('info', `${e.calcConstExpr(op.children[0], 'number', ctx)}`, '\n')
+        e.logger.log('info', `${e.calcConstExpr(op.children[0], 'number', ctx)}`)
     },
     printf: (_, op, __, ctx, e) => {
         if (op.children.length !== 1) {
             e.error('Keyword needs exactly one argument', op.token, ctx)
             return
         }
-        e.logger.log('info', `${e.calcConstExpr(op.children[0], 'number', ctx) / 65536}`, '\n')
+        e.logger.log('info', `${e.calcConstExpr(op.children[0], 'number', ctx) / 65536}`)
     },
     reseed: (_, op, __, ctx, e) => {
         if (!e.isFeatureEnabled('random_functions', op.token, ctx)) {

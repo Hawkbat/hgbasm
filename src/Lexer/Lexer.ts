@@ -48,8 +48,8 @@ export default class Lexer {
         })
 
         if (ctx.line.text !== ctx.line.source.text) {
-            this.logger.log('stringExpansion', 'Before:', ctx.line.source.text, '\n')
-            this.logger.log('stringExpansion', 'After: ', ctx.line.text, '\n')
+            this.logger.logLine('stringExpansion', 'Before:', ctx.line.source.text)
+            this.logger.logLine('stringExpansion', 'After: ', ctx.line.text)
         }
 
         ctx.tokens = ctx.tokens.map((token) => token.clone())
@@ -178,7 +178,7 @@ export default class Lexer {
     public substituteToken(token: Token, value: string, ctx: LexerContext): void {
         ctx.line.text = ctx.line.text.substring(0, token.col) + value + ctx.line.text.substring(token.col + token.value.length)
         token.type = TokenType.replaced
-        this.logger.log('stringExpansion', 'Substituting', token.value, 'for', value, '\n')
+        this.logger.logLine('stringExpansion', 'Substituting', token.value, 'for', value)
     }
 
     public applyTextReplace(text: string, regex: RegExp, value: string): string {

@@ -90,6 +90,8 @@ const levelMap: { [key in LogType]: LogLevel } = {
 }
 
 export default class Logger {
+    private lastWasNewline = true
+
     constructor(
         public pipe: ILogPipe,
         public level: LogLevel = 'info'
@@ -97,9 +99,19 @@ export default class Logger {
 
     }
 
+    public logLine(type: LogType, ...msg: string[]): void {
+        const text = msg.join(' ').replace(/\t/g, '    ')
+        if (this.lastWasNewline) {
+            this.log(type, `${text}\n`)
+        } else {
+            this.log(type, `\n${text}\n`)
+        }
+    }
+
     public log(type: LogType, ...msg: string[]): void {
         if (levelArr.indexOf(levelMap[type]) <= levelArr.indexOf(this.level)) {
             let text = msg.join(' ').replace(/\t/g, '    ')
+            this.lastWasNewline = text.endsWith('\n')
             if (this.pipe.allowAnsi) {
                 text = `${colorMap[type]}${text}${Ansi.Reset}`
             }

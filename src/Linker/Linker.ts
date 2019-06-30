@@ -35,7 +35,7 @@ export default class Linker {
             const link = this.allocate(section, ctx)
             if (link) {
                 ctx.linkSections.push(link)
-                this.logger.log('linkSection', `${RegionType[link.region]}[${link.bank}] ${this.hexString(link.start)} - ${this.hexString(link.end)} = ${link.section.name}`)
+                this.logger.logLine('linkSection', `${RegionType[link.region]}[${link.bank}] ${this.hexString(link.start)} - ${this.hexString(link.end)} = ${link.section.name}`)
 
                 if (link.region === RegionType.rom0 || link.region === RegionType.romx) {
                     totalBanks = Math.max(totalBanks, link.bank + 1)
@@ -313,7 +313,7 @@ export default class Linker {
             return
         }
         const index = 0x4000 * link.bank + link.start - (link.region === RegionType.romx ? 0x4000 : 0x0000)
-        this.logger.log('linkPatch', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.data.length - 1, 5)} = ${link.section.name} `)
+        this.logger.logLine('linkPatch', `Filling ${this.hexString(index, 5)} - ${this.hexString(index + link.section.data.length - 1, 5)} = ${link.section.name} `)
         bs.index = index
         bs.writeBytes(link.section.data)
     }
@@ -323,7 +323,7 @@ export default class Linker {
         const index = 0x4000 * link.bank + link.start - (link.region === RegionType.romx ? 0x4000 : 0x0000) + patch.offset
         const address = link.start + patch.offset
 
-        this.logger.log('linkPatch', `Filling ${this.hexString(index)} = ${this.hexString(val)} `)
+        this.logger.logLine('linkPatch', `Filling ${this.hexString(index)} = ${this.hexString(val)}`)
 
         bs.index = index
         if (patch.type === PatchType.byte) {

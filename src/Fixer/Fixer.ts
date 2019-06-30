@@ -10,7 +10,7 @@ export default class Fixer {
 
     public fix(ctx: FixerContext): FixerContext {
         if (!ctx.romFile) {
-            this.logger.log('error', 'Fixer error: File was fixed before linking, aborting')
+            this.logger.logLine('error', 'Fixer error: File was fixed before linking, aborting')
             return ctx
         }
 

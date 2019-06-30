@@ -307,7 +307,7 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
             }
         }
         if (source !== op.token.value) {
-            e.logger.log('stringExpansion', 'String expansion of', op.token.value, 'to', source, '\n')
+            e.logger.logLine('stringExpansion', 'String expansion of', op.token.value, 'to', source)
         }
         return source
     },

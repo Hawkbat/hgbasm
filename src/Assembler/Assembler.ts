@@ -55,7 +55,7 @@ export default class Assembler {
         for (let i = file.startLine; i <= file.endLine; i++) {
             const line = file.lines[i]
 
-            this.logger.log('lineSource', `${line.file.source.path} (${i})`, line.source.text, '\n')
+            this.logger.logLine('lineSource', `${line.file.source.path} (${i})`, line.source.text)
 
             await this.lexer.lex(new LexerContext(line, ctx.diagnostics, state))
             await this.parser.parse(new ParserContext(line, ctx.diagnostics, state))
@@ -64,14 +64,14 @@ export default class Assembler {
             if (ctx.diagnostics.some((diag) => diag.type === 'error')) {
                 if (line.lex && line.lex.tokens) {
                     for (const token of line.lex.tokens) {
-                        this.logger.log('tokenStream', token.toString(), '\n')
+                        this.logger.logLine('tokenStream', token.toString())
                     }
                 }
                 if (line.parse && line.parse.node) {
-                    this.logger.log('lineNode', line.parse.node.toString(), '\n')
+                    this.logger.logLine('lineNode', line.parse.node.toString())
                 }
                 if (line.eval) {
-                    this.logger.log('lineState', JSON.stringify(line.eval.state, null, 4), '\n')
+                    this.logger.logLine('lineState', JSON.stringify(line.eval.state, null, 4))
                 }
                 break
             }
