@@ -9,7 +9,7 @@ const PredefineRules: { [key: string]: PredefineRule } = {
     _RS: (_, ctx) => ctx.state.rsCounter ? ctx.state.rsCounter : 0,
     _NARG: (_, ctx) => {
         if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
-            return ctx.state.inMacroCalls[0].args.length
+            return ctx.state.inMacroCalls[0].args.length - ctx.state.inMacroCalls[0].argOffset
         } else {
             return 0
         }
