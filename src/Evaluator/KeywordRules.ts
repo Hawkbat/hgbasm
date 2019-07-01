@@ -543,6 +543,9 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         }
 
         state.inSections = state.inSections ? state.inSections : []
+        if (state.inSections.length) {
+            state.inSections.shift()
+        }
         state.inSections.unshift(id)
 
         ctx.meta.section = id
@@ -552,7 +555,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         state.inSections.unshift('')
     },
     pops: (state, op, _, ctx, e) => {
-        if (!state.inSections || !state.inSections.length || !state.inSections[0]) {
+        if (!state.inSections || !state.inSections.length) {
             e.error('Cannot pop from empty section stack', op.token, ctx)
             return
         }
