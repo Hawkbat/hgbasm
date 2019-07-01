@@ -438,28 +438,20 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             return
         }
         for (const child of op.children) {
-            const id = child.token.value
-            if (!state.labels || !state.labels[id]) {
-                e.error('Label is not defined', child.token, ctx)
+            let id = child.token.value
+            if (id.startsWith('.')) {
+                id = ctx.state.inGlobalLabel + id
+            }
+            if (id.includes(':')) {
+                e.error('Keyword argument must not contain a colon', child.token, ctx)
                 continue
             }
-            state.labels[id].exported = true
-        }
-    },
-    global: (state, op, _, ctx, e) => {
-        if (!op.children.length) {
-            e.error('Keyword needs at least one argument', op.token, ctx)
-            return
-        }
-        for (const child of op.children) {
-            const id = child.token.value
-            if (!state.labels || !state.labels[id]) {
-                e.error('Label is not defined', child.token, ctx)
-                continue
+            if (state.labels && state.labels[id]) {
+                state.labels[id].exported = true
             }
-            state.labels[id].exported = true
         }
     },
+    global: (state, op, _, ctx, e) => KeywordRules.export(state, op, _, ctx, e),
     purge: (state, op, _, ctx, e) => {
         if (!op.children.length) {
             e.error('Keyword needs at least one argument', op.token, ctx)
