@@ -37,6 +37,7 @@ const FormatRules: { [key: number]: FormatRule } = {
         const indent = first.type === NodeType.opcode ||
             first.type === NodeType.macro_call ||
             (first.type === NodeType.comment && first.token.col > 0) ||
+            (first.type === NodeType.keyword && first.token.col > 0) ||
             (first.type === NodeType.keyword && PSEUDO_OPS.includes(first.token.value.toLowerCase()))
         return `${indent ? f.indent(ctx) : ''}${f.formatNode(first, ctx)}${n.children.slice(1).map((c) => ` ${f.formatNode(c, ctx)}`).join('')}`
     },
@@ -52,7 +53,13 @@ const FormatRules: { [key: number]: FormatRule } = {
     [NodeType.region]: (n, ctx, f) => `${f.capitalize(n.token.value, ctx.options.regionCase)}${n.children.length ? f.formatNode(n.children[0], ctx) : ''}`,
     [NodeType.register]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.registerCase),
     [NodeType.string]: (n) => n.token.value,
-    [NodeType.unary_operator]: (n, ctx, f) => `${n.token.value}${f.formatNode(n.children[0], ctx)}`
+    [NodeType.unary_operator]: (n, ctx, f) => {
+        if (n.token.value === '=') {
+            return `${n.token.value} ${f.formatNode(n.children[0], ctx)}`
+        } else {
+            return `${n.token.value}${f.formatNode(n.children[0], ctx)}`
+        }
+    }
 }
 
 export default FormatRules

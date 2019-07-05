@@ -1,4 +1,4 @@
 
-type CapsStyle = 'uppercase' | 'lowercase' | 'preserve'
+type CasingStyle = 'uppercase' | 'lowercase' | 'preserve'
 
-export default CapsStyle
+export default CasingStyle
