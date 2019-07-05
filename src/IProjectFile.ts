@@ -1,7 +1,9 @@
-import MBCType from './Fixer/MBCType'
-import RAMSize from './Fixer/RAMSize'
-import ROMSize from './Fixer/ROMSize'
-import CasingStyle from './Formatter/CasingStyle'
+import IAnalyzerOptions from './Analyzer/IAnalyzerOptions'
+import IAssemblerOptions from './Assembler/IAssemblerOptions'
+import IAutoCompleterOptions from './AutoCompleter/IAutoCompleterOptions'
+import IFixerOptions from './Fixer/IFixerOptions'
+import IFormatterOptions from './Formatter/IFormatterOptions'
+import ILinkerOptions from './Linker/ILinkerOptions'
 import { LogLevel } from './Logger'
 
 export default interface IProjectFile {
@@ -13,16 +15,10 @@ export default interface IProjectFile {
         outputObjectFiles?: boolean
         objectPath?: string
         logLevel?: LogLevel
-        settings?: {
-            padding?: number
-            exportAllLabels?: boolean
-            nopAfterHalt?: boolean
-            optimizeLd?: boolean
-            debugDefineName?: string
-            debugDefineValue?: string
-        }
+        settings?: Partial<IAssemblerOptions>
     }
     linker?: {
+        objectPaths?: string[]
         outputRomFile?: boolean
         romPath?: string
         outputMapFile?: boolean
@@ -34,49 +30,23 @@ export default interface IProjectFile {
         useLinkerScript?: boolean
         linkerScriptPath?: string
         logLevel?: LogLevel
-        settings?: {
-            padding?: number
-            disableWramBanks?: boolean
-            disableRomBanks?: boolean
-            disableVramBanks?: boolean
-        }
+        settings?: Partial<ILinkerOptions>
     }
     fixer?: {
         outputRomFile?: boolean
         romPath?: string
         outputPath?: string
         logLevel?: LogLevel
-        settings?: {
-            padding?: number
-            cgbCompatibility?: 'cgb' | 'dmg' | 'both'
-            sgbCompatible?: boolean
-            nintendoLogo?: 'fix' | 'trash'
-            headerChecksum?: 'fix' | 'trash'
-            globalChecksum?: 'fix' | 'trash'
-            japanese?: boolean
-            licensee?: string
-            licenseeCode?: number | 'use-licensee' | 'none'
-            mbcType?: number | MBCType
-            romSize?: number | ROMSize
-            ramSize?: number | RAMSize
-            gameId?: string
-            gameTitle?: string
-            gameVersion?: number
-        }
+        settings?: Partial<IFixerOptions>
     }
     formatter?: {
-        settings?: {
-            useSpaces?: boolean
-            tabSize?: number
-            keywordCase?: CasingStyle
-            opcodeCase?: CasingStyle
-            pseudoOpCase?: CasingStyle
-            conditionCodeCase?: CasingStyle
-            registerCase?: CasingStyle
-            functionCase?: CasingStyle
-            regionCase?: CasingStyle
-            hexLetterCase?: CasingStyle
-        }
+        settings?: Partial<IFormatterOptions>
+    }
+    analyzer?: {
+        settings?: Partial<IAnalyzerOptions>
+    }
+    autoCompleter?: {
+        settings?: Partial<IAutoCompleterOptions>
     }
     emulator?: {
         path?: string

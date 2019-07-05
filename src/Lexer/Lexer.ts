@@ -25,6 +25,8 @@ export default class Lexer {
 
         ctx.tokens.push(new Token(TokenType.start_of_line, '', ctx.line.lineNumber, 0))
 
+        let replacementCount = 0
+
         let index = 0
         while (index < ctx.line.text.length) {
             const token = this.lexToken(index, ctx.inType, ctx)
@@ -34,8 +36,14 @@ export default class Lexer {
                 ctx.tokens.push(token)
                 index = token.col + token.value.length
             } else {
-                ctx.tokens.length = 1
-                index = 0
+                if (replacementCount > 1000) {
+                    this.error('Potentially infinite symbol expansion detected; aborting', token, ctx)
+                    break
+                } else {
+                    ctx.tokens.length = 1
+                    index = 0
+                    replacementCount++
+                }
             }
         }
 
@@ -81,7 +89,7 @@ export default class Lexer {
             match = new Token(TokenType.unknown, ctx.line.text.substr(index, 1), ctx.line.lineNumber, index)
         }
         if (match && TokenReplacementRules[match.type]) {
-            TokenReplacementRules[match.type](match, inType, ctx, this)
+            TokenReplacementRules[match.type](match, inType, ctx.context.state, ctx, this)
         }
         return match
     }
@@ -222,6 +230,6 @@ export default class Lexer {
     }
 
     public error(msg: string, token: Token | undefined, ctx: LexerContext): void {
-        ctx.diagnostics.push(new Diagnostic('Lexer', msg, 'error', token, ctx.line))
+        ctx.context.diagnostics.push(new Diagnostic('Lexer', msg, 'error', token, ctx.line))
     }
 }

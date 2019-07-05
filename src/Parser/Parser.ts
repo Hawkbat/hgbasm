@@ -18,18 +18,19 @@ export default class Parser {
     }
 
     public parse(ctx: ParserContext): ParserContext {
+        const state = ctx.context.state
         if (ctx.line.lex) {
             const checkMacro =
-                ctx.state.inMacroDefines &&
-                ctx.state.inMacroDefines.length &&
+                state.inMacroDefines &&
+                state.inMacroDefines.length &&
                 !ctx.line.lex.tokens.some((t) =>
                     t.type === TokenType.keyword &&
                     (t.value.toLowerCase() === 'macro' ||
                         t.value.toLowerCase() === 'endm'))
             const checkConditional =
-                ctx.state.inConditionals &&
-                ctx.state.inConditionals.length &&
-                !ctx.state.inConditionals.every((cond) => cond.condition) &&
+                state.inConditionals &&
+                state.inConditionals.length &&
+                !state.inConditionals.every((cond) => cond.condition) &&
                 !(ctx.line.lex.tokens &&
                     ctx.line.lex.tokens.some((t) =>
                         t.value.toLowerCase() === 'if' ||
@@ -107,6 +108,6 @@ export default class Parser {
     }
 
     public error(msg: string, token: Token | undefined, ctx: ParserContext): void {
-        ctx.diagnostics.push(new Diagnostic('Parser', msg, 'error', token, ctx.line))
+        ctx.context.diagnostics.push(new Diagnostic('Parser', msg, 'error', token, ctx.line))
     }
 }

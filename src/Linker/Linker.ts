@@ -27,7 +27,7 @@ export default class Linker {
         const sections = this.getAllSections(ctx)
         let totalBanks = 1
 
-        if (ctx.options.linkerScript) {
+        if (ctx.linkerScript) {
             this.applyLinkerScript(sections, ctx)
         }
 
@@ -43,22 +43,17 @@ export default class Linker {
             }
         }
 
-        if (ctx.options.generateSymbolFile) {
-            ctx.symbolFile = this.getSymbolFile(ctx)
-        }
-
-        if (ctx.options.generateMapFile) {
-            ctx.mapFile = this.getMapFile(ctx)
-        }
+        ctx.symbolFile = this.getSymbolFile(ctx)
+        ctx.mapFile = this.getMapFile(ctx)
 
         let data: Uint8Array
 
-        if (ctx.options.overlay) {
+        if (ctx.overlay) {
             if (sections.some((s) => s.address < 0 || s.bank < 0)) {
                 this.error('All sections must have fixed addresses and banks if using an overlay ROM.', undefined, ctx)
                 return ctx
             }
-            data = new Uint8Array(ctx.options.overlay)
+            data = new Uint8Array(ctx.overlay)
         } else {
             data = new Uint8Array(ctx.options.disableRomBanks ? 0x8000 : totalBanks * 0x4000)
             data.fill(ctx.options.padding)
@@ -351,7 +346,10 @@ export default class Linker {
     }
 
     public applyLinkerScript(sections: IObjectSection[], ctx: LinkerContext): void {
-        const lines = ctx.options.linkerScript.split(/\r?\n/g)
+        if (!ctx.linkerScript) {
+            return
+        }
+        const lines = ctx.linkerScript.split(/\r?\n/g)
 
         const addrs: { [key: string]: number } = {}
         let region = RegionType.rom0

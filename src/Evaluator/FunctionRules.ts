@@ -277,9 +277,10 @@ const FunctionRules: { [key: string]: IFunctionRule } = {
         return: { type: 'number', desc: 'The bank number' },
         desc: 'Calculates the bank of the current section (@), a specified section, or a label',
         rule: (op, ctx, e) => {
-            const id = `${op.children[1].token.value.startsWith('.') ? ctx.state.inGlobalLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
-            if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
-                return ctx.state.numberEquates[id].value
+            const state = ctx.context.state
+            const id = `${op.children[1].token.value.startsWith('.') ? state.inGlobalLabel + op.children[1].token.value : op.children[1].token.value}__BANK`
+            if (state.numberEquates && state.numberEquates.hasOwnProperty(id)) {
+                return state.numberEquates[id].value
             } else {
                 e.error('Bank is not known or no matching symbol', op.children[1].token, ctx)
                 return 0
@@ -293,21 +294,22 @@ const FunctionRules: { [key: string]: IFunctionRule } = {
         return: { type: 'number', desc: '1 if symbol is defined, 0 if it is not' },
         desc: 'Checks if a symbol (label, equate, macro, etc.) has been defined',
         rule: (op, ctx, e) => {
+            const state = ctx.context.state
             if (op.children.length === 2) {
                 const id = op.children[1].token.value
-                if (ctx.state.labels && ctx.state.labels[id]) {
+                if (state.labels && state.labels[id]) {
                     return 1
                 }
-                if (ctx.state.numberEquates && ctx.state.numberEquates[id]) {
+                if (state.numberEquates && state.numberEquates[id]) {
                     return 1
                 }
-                if (ctx.state.stringEquates && ctx.state.stringEquates[id]) {
+                if (state.stringEquates && state.stringEquates[id]) {
                     return 1
                 }
-                if (ctx.state.sets && ctx.state.sets[id]) {
+                if (state.sets && state.sets[id]) {
                     return 1
                 }
-                if (ctx.state.macros && ctx.state.macros[id]) {
+                if (state.macros && state.macros[id]) {
                     return 1
                 }
                 return 0

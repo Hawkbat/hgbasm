@@ -42,10 +42,11 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
         }
     },
     '-': (op, ctx, e) => {
+        const state = ctx.context.state
         if (op.children.length === 2) {
-            if (ctx.state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
-                const left = ctx.state.labels[op.children[0].token.value]
-                const right = ctx.state.labels[op.children[1].token.value]
+            if (state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
+                const left = state.labels[op.children[0].token.value]
+                const right = state.labels[op.children[1].token.value]
                 if (left && right && left.section === right.section) {
                     return left.byteOffset - right.byteOffset
                 }
@@ -203,6 +204,7 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
         }
     },
     [NodeType.string]: (op, ctx, e) => {
+        const state = ctx.context.state
         let source = op.token.value
 
         if (op.token.type === TokenType.macro_argument) {
@@ -235,12 +237,12 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
                         anyReplaced = true
                     }
                 }
-                if (ctx.state.sets) {
-                    for (const key of Object.keys(ctx.state.sets)) {
+                if (state.sets) {
+                    for (const key of Object.keys(state.sets)) {
                         if (source.indexOf(key) === -1) {
                             continue
                         }
-                        const value = `$${ctx.state.sets[key].value.toString(16).toUpperCase()}`
+                        const value = `$${state.sets[key].value.toString(16).toUpperCase()}`
                         const regex = getCachedRegExp(`\\{${key}\\}`)
                         const newSource = e.applySourceReplace(source, regex, value)
                         if (source !== newSource) {
@@ -249,12 +251,12 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
                         }
                     }
                 }
-                if (ctx.state.numberEquates) {
-                    for (const key of Object.keys(ctx.state.numberEquates)) {
+                if (state.numberEquates) {
+                    for (const key of Object.keys(state.numberEquates)) {
                         if (source.indexOf(key) === -1) {
                             continue
                         }
-                        const value = `$${ctx.state.numberEquates[key].value.toString(16).toUpperCase()}`
+                        const value = `$${state.numberEquates[key].value.toString(16).toUpperCase()}`
                         const regex = getCachedRegExp(`\\{${key}\\}`)
                         const newSource = e.applySourceReplace(source, regex, value)
                         if (source !== newSource) {
@@ -263,12 +265,12 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
                         }
                     }
                 }
-                if (ctx.state.stringEquates) {
-                    for (const key of Object.keys(ctx.state.stringEquates)) {
+                if (state.stringEquates) {
+                    for (const key of Object.keys(state.stringEquates)) {
                         if (source.indexOf(key) === -1) {
                             continue
                         }
-                        const value = ctx.state.stringEquates[key].value
+                        const value = state.stringEquates[key].value
                         const regex = getCachedRegExp(`\\{${key}\\}`)
                         const newSource = e.applySourceReplace(source, regex, value)
                         if (source !== newSource) {
@@ -277,8 +279,8 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
                         }
                     }
                 }
-                if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
-                    const macroCall = ctx.state.inMacroCalls[0]
+                if (state.inMacroCalls && state.inMacroCalls.length) {
+                    const macroCall = state.inMacroCalls[0]
                     for (let key = 1; key < 10; key++) {
                         if (source.indexOf(`\\${key}`) === -1) {
                             continue
@@ -293,9 +295,9 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
                         }
                     }
                 }
-                if (ctx.state.macroCounter !== undefined) {
+                if (state.macroCounter !== undefined) {
                     if (source.indexOf('\\@') >= 0) {
-                        const value = `_${ctx.state.macroCounter}`
+                        const value = `_${state.macroCounter}`
                         const regex = getCachedRegExp(`\\\\@`)
                         const newSource = e.applySourceReplace(source, regex, value)
                         if (source !== newSource) {
@@ -323,17 +325,18 @@ const ConstExprRules: { [key: string]: ConstExprRule } = {
         return e.calcConstExpr(op.children[0], 'number', ctx)
     },
     [NodeType.identifier]: (op, ctx, e) => {
-        const id = op.token.value.startsWith('.') ? ctx.state.inGlobalLabel + op.token.value : op.token.value
+        const state = ctx.context.state
+        const id = op.token.value.startsWith('.') ? state.inGlobalLabel + op.token.value : op.token.value
         if (PredefineRules[id]) {
             return PredefineRules[id](op, ctx, e)
         }
-        if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(id)) {
-            return ctx.state.numberEquates[id].value
-        } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(id)) {
-            return ctx.state.stringEquates[id].value
-        } else if (ctx.state.sets && ctx.state.sets.hasOwnProperty(id)) {
-            return ctx.state.sets[id].value
-        } else if (ctx.state.labels && ctx.state.labels.hasOwnProperty(id)) {
+        if (state.numberEquates && state.numberEquates.hasOwnProperty(id)) {
+            return state.numberEquates[id].value
+        } else if (state.stringEquates && state.stringEquates.hasOwnProperty(id)) {
+            return state.stringEquates[id].value
+        } else if (state.sets && state.sets.hasOwnProperty(id)) {
+            return state.sets[id].value
+        } else if (state.labels && state.labels.hasOwnProperty(id)) {
             e.error('Labels cannot be used in constant expressions', op.token, ctx)
             return 0
         } else {

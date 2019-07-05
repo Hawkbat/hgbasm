@@ -6,16 +6,16 @@ type PredefineRule = (op: Node, ctx: EvaluatorContext, e: Evaluator) => number |
 
 const PredefineRules: { [key: string]: PredefineRule } = {
     _PI: () => Math.round(Math.PI * 65536),
-    _RS: (_, ctx) => ctx.state.rsCounter ? ctx.state.rsCounter : 0,
+    _RS: (_, ctx) => ctx.context.state.rsCounter ? ctx.context.state.rsCounter : 0,
     _NARG: (_, ctx) => {
-        if (ctx.state.inMacroCalls && ctx.state.inMacroCalls.length) {
-            return ctx.state.inMacroCalls[0].args.length - ctx.state.inMacroCalls[0].argOffset
+        if (ctx.context.state.inMacroCalls && ctx.context.state.inMacroCalls.length) {
+            return ctx.context.state.inMacroCalls[0].args.length - ctx.context.state.inMacroCalls[0].argOffset
         } else {
             return 0
         }
     },
-    __LINE__: (_, ctx) => ctx.state.line,
-    __FILE__: (_, ctx) => ctx.state.file,
+    __LINE__: (_, ctx) => ctx.context.state.line,
+    __FILE__: (_, ctx) => ctx.context.state.file,
     __DATE__: (_, ctx) => {
         const date = ctx.context.startDateTime
         const days = date.getDate().toString().padStart(2, '0')

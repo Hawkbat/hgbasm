@@ -1,5 +1,10 @@
 import Logger from '../Logger'
 import FixerContext from './FixerContext'
+import Licensee from './Licensee'
+import LicenseeCode from './LicenseeCode'
+import MBCType from './MBCType'
+import RAMSize from './RAMSize'
+import ROMSize from './ROMSize'
 
 export default class Fixer {
     public logger: Logger
@@ -41,31 +46,49 @@ export default class Fixer {
                         0x00
         }
         if (opts.licensee !== undefined) {
-            data.set(opts.licensee.padEnd(2, ' ').substr(0, 2).split('').map((c) => c.charCodeAt(0)), 0x0144)
+            const licensee =
+                opts.licensee in Licensee ?
+                    Licensee[opts.licensee as keyof typeof Licensee] :
+                    opts.licensee
+            data.set(licensee.padEnd(2, ' ').substr(0, 2).split('').map((c) => c.charCodeAt(0)), 0x0144)
         }
         if (opts.sgbCompatible !== undefined) {
             data[0x0146] = opts.sgbCompatible ? 0x03 : 0x00
         }
         if (opts.mbcType !== undefined) {
-            data[0x0147] = opts.mbcType & 0xFF
+            const mbcType =
+                typeof opts.mbcType === 'number' ?
+                    opts.mbcType :
+                    MBCType[opts.mbcType]
+            data[0x0147] = mbcType & 0xFF
         }
         if (opts.romSize !== undefined) {
-            if (typeof opts.romSize === 'number') {
-                data[0x0148] = opts.romSize & 0xFF
-            } else if (opts.romSize === 'auto') {
-                data[0x0148] = romSizePadFactor & 0xFF
-            }
+            const romSize =
+                typeof opts.romSize === 'number' ?
+                    opts.romSize :
+                    opts.romSize === 'auto' ?
+                        romSizePadFactor :
+                        ROMSize[opts.romSize]
+            data[0x0148] = romSize & 0xFF
         }
         if (opts.ramSize !== undefined) {
-            data[0x0149] = opts.ramSize & 0xFF
+            const ramSize =
+                typeof opts.ramSize === 'number' ?
+                    opts.ramSize :
+                    RAMSize[opts.ramSize]
+            data[0x0149] = ramSize & 0xFF
         }
         if (opts.japanese !== undefined) {
             data[0x014A] = opts.japanese ? 0x00 : 0x01
         }
         if (opts.licenseeCode !== undefined) {
-            data[0x014B] = opts.licenseeCode & 0xFF
-        } else if (opts.licensee !== undefined) {
-            data[0x014B] = 0x33
+            const licenseeCode =
+                typeof opts.licenseeCode === 'number' ?
+                    opts.licenseeCode :
+                    opts.licenseeCode === 'use-licensee' ?
+                        0x33 :
+                        LicenseeCode[opts.licenseeCode]
+            data[0x014B] = licenseeCode & 0xFF
         }
         if (opts.gameVersion !== undefined) {
             data[0x014C] = opts.gameVersion & 0xFF

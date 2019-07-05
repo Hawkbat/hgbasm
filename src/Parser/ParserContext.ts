@@ -1,19 +1,16 @@
+import AssemblerContext from '../Assembler/AssemblerContext'
 import LineContext from '../Assembler/LineContext'
-import Diagnostic from '../Diagnostic'
-import ILineState from '../LineState/ILineState'
 import Node from '../Node'
 import Token from '../Token'
 
 export default class ParserContext {
+    public context: AssemblerContext
     public line: LineContext
-    public diagnostics: Diagnostic[]
     public tokens: Token[] = []
-    public state: ILineState
     public node?: Node
 
-    constructor(line: LineContext, diagnostics: Diagnostic[], state: ILineState) {
+    constructor(context: AssemblerContext, line: LineContext) {
+        this.context = context
         this.line = line
-        this.diagnostics = diagnostics
-        this.state = state
     }
 }

@@ -245,10 +245,6 @@ const EvaluatorRules: { [key: number]: EvaluatorRule } = {
             return
         }
 
-        if (ctx.context.dependencies.indexOf(srcFile.path) < 0) {
-            ctx.context.dependencies.push(srcFile.path)
-        }
-
         const args = op.children.map((n) => e.calcConstExpr(n, 'string', ctx))
 
         state.inMacroCalls = state.inMacroCalls ? state.inMacroCalls : []
@@ -261,7 +257,11 @@ const EvaluatorRules: { [key: number]: EvaluatorRule } = {
         e.logger.logLine('enterScope', 'Enter macro call', op.token.value, args.join(', '))
 
         const file = new FileContext(srcFile, ctx.line.file, `${ctx.line.file.scope}(${ctx.line.lineNumber + 1}) -> ${macro.id}`, startLine, endLine)
-        await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
+        await ctx.context.assembler.assembleNestedFile(ctx.context, file)
+
+        if (!ctx.context.dependencies.find((d) => d.path === srcFile.path)) {
+            ctx.context.dependencies.push({ path: srcFile.path, type: 'source' })
+        }
 
         e.logger.logLine('exitScope', 'Exit macro call', op.token.value)
 

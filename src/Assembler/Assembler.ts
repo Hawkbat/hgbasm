@@ -3,7 +3,6 @@ import Evaluator from '../Evaluator/Evaluator'
 import EvaluatorContext from '../Evaluator/EvaluatorContext'
 import Lexer from '../Lexer/Lexer'
 import LexerContext from '../Lexer/LexerContext'
-import ILineState from '../LineState/ILineState'
 import RegionType from '../Linker/RegionType'
 import SymbolType from '../Linker/SymbolType'
 import Logger from '../Logger'
@@ -27,39 +26,24 @@ export default class Assembler {
         this.evaluator = new Evaluator(this.logger)
     }
 
-    public async assemble(ctx: AssemblerContext, initialState?: ILineState): Promise<AssemblerContext> {
-        const state: ILineState = {
-            ...initialState,
-            line: ctx.file.startLine,
-            file: ctx.file.source.path
-        }
-        if (ctx.options.debugDefineName) {
-            state.stringEquates = state.stringEquates ? state.stringEquates : {}
-            state.stringEquates[ctx.options.debugDefineName] = {
-                id: ctx.options.debugDefineName,
-                startLine: 0,
-                endLine: 0,
-                file: ctx.file.source.path,
-                value: ctx.options.debugDefineValue
-            }
-        }
-
-        await this.assembleNestedFile(ctx, ctx.file, state)
-
-        await this.buildObjectFile(ctx, state)
-
+    public async assemble(ctx: AssemblerContext): Promise<AssemblerContext> {
+        await this.assembleNestedFile(ctx, ctx.rootFile)
+        await this.buildObjectFile(ctx)
         return ctx
     }
 
-    public async assembleNestedFile(ctx: AssemblerContext, file: FileContext, state: ILineState): Promise<void> {
+    public async assembleNestedFile(ctx: AssemblerContext, file: FileContext): Promise<void> {
         for (let i = file.startLine; i <= file.endLine; i++) {
             const line = file.lines[i]
 
+            ctx.state.file = line.file.source.path
+            ctx.state.line = line.lineNumber
+
             this.logger.logLine('lineSource', `${line.file.source.path} (${i})`, line.source.text)
 
-            await this.lexer.lex(new LexerContext(line, ctx.diagnostics, state))
-            await this.parser.parse(new ParserContext(line, ctx.diagnostics, state))
-            await this.evaluator.evaluate(new EvaluatorContext(ctx, line, ctx.diagnostics, state))
+            await this.lexer.lex(new LexerContext(ctx, line))
+            await this.parser.parse(new ParserContext(ctx, line))
+            await this.evaluator.evaluate(new EvaluatorContext(ctx, line))
 
             if (ctx.diagnostics.some((diag) => diag.type === 'error')) {
                 if (line.lex && line.lex.tokens) {
@@ -71,17 +55,17 @@ export default class Assembler {
                     this.logger.logLine('lineNode', line.parse.node.toString())
                 }
                 if (line.eval) {
-                    this.logger.logLine('lineState', JSON.stringify(line.eval.state, null, 4))
+                    this.logger.logLine('lineState', JSON.stringify(ctx.state, null, 4))
                 }
                 break
             }
         }
     }
 
-    public async buildObjectFile(ctx: AssemblerContext, state: ILineState): Promise<void> {
-        const sectionKeys = state.sections ? Object.keys(state.sections) : []
-        if (state.labels) {
-            for (const v of Object.values(state.labels)) {
+    public async buildObjectFile(ctx: AssemblerContext): Promise<void> {
+        const sectionKeys = ctx.state.sections ? Object.keys(ctx.state.sections) : []
+        if (ctx.state.labels) {
+            for (const v of Object.values(ctx.state.labels)) {
                 const symbol = ctx.objectFile.symbols.find((s) => s.name === v.id)
                 if (symbol) {
                     symbol.name = v.id
@@ -103,9 +87,9 @@ export default class Assembler {
                 }
             }
         }
-        if (state.sections) {
+        if (ctx.state.sections) {
             for (const key of sectionKeys) {
-                const v = state.sections[key]
+                const v = ctx.state.sections[key]
                 ctx.objectFile.sections.push({
                     id: ctx.objectFile.sections.length,
                     name: v.id,

@@ -196,7 +196,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
 
         for (let i = 0; i < count; i++) {
             const file = new FileContext(ctx.line.file.source, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}) -> rept`, startLine, endLine)
-            await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
+            await ctx.context.assembler.assembleNestedFile(ctx.context, file)
         }
         state.inMacroCalls.shift()
         state.inRepeats.shift()
@@ -402,11 +402,14 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Could not find a matching file to include', op.token, ctx)
             return
         }
-        if (ctx.context.dependencies.indexOf(inc.path) < 0) {
-            ctx.context.dependencies.push(inc.path)
-        }
         const file = new FileContext(inc, ctx.line.file, `${ctx.line.file.scope}(${lineNumber + 1}) -> ${inc.path}`)
-        await ctx.context.assembler.assembleNestedFile(ctx.context, file, state)
+        await ctx.context.assembler.assembleNestedFile(ctx.context, file)
+        if (!ctx.context.files.includes(file)) {
+            ctx.context.files.push(file)
+        }
+        if (!ctx.context.dependencies.find((d) => d.path === inc.path)) {
+            ctx.context.dependencies.push({ path: inc.path, type: 'source' })
+        }
     },
     incbin: async (state, op, label, ctx, e) => {
         if (label) {
@@ -424,8 +427,8 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('Could not find a matching file to include', op.token, ctx)
             return
         }
-        if (ctx.context.dependencies.indexOf(inc.path) < 0) {
-            ctx.context.dependencies.push(inc.path)
+        if (!ctx.context.dependencies.find((d) => d.path === inc.path)) {
+            ctx.context.dependencies.push({ path: inc.path, type: 'binary' })
         }
         const data = new Uint8Array(inc.buffer)
         const startOffset = op.children.length === 3 ? e.calcConstExpr(op.children[1], 'number', ctx) : 0
@@ -440,7 +443,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         for (const child of op.children) {
             let id = child.token.value
             if (id.startsWith('.')) {
-                id = ctx.state.inGlobalLabel + id
+                id = state.inGlobalLabel + id
             }
             if (id.includes(':')) {
                 e.error('Keyword argument must not contain a colon', child.token, ctx)

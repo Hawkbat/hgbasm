@@ -37,35 +37,37 @@ export default class Evaluator {
             return ctx
         }
 
+        const state = ctx.context.state
+
         const checkConditionals =
-            !ctx.state.inConditionals ||
-            !ctx.state.inConditionals.length ||
-            ctx.state.inConditionals.every((cond) => cond.condition) ||
+            !state.inConditionals ||
+            !state.inConditionals.length ||
+            state.inConditionals.every((cond) => cond.condition) ||
             (ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'if' || t.value.toLowerCase() === 'elif' || t.value.toLowerCase() === 'else' || t.value.toLowerCase() === 'endc'))
         const checkRepts =
-            !ctx.state.inRepeats ||
-            !ctx.state.inRepeats.length ||
+            !state.inRepeats ||
+            !state.inRepeats.length ||
             (ctx.line.lex.tokens && ctx.line.lex.tokens.some((t) => t.value.toLowerCase() === 'endr'))
 
         if (checkConditionals && checkRepts) {
-            await this.evaluateLine(ctx.state, ctx.line, ctx)
+            await this.evaluateLine(state, ctx.line, ctx)
         }
 
-        ctx.meta.inSection = ctx.state.inSections && ctx.state.inSections.length ? ctx.state.inSections[0] : ''
-        ctx.meta.inGlobalLabel = ctx.state.inGlobalLabel ? ctx.state.inGlobalLabel : ''
-        ctx.meta.inLabel = ctx.state.inLabel ? ctx.state.inLabel : ''
+        ctx.meta.inSection = state.inSections && state.inSections.length ? state.inSections[0] : ''
+        ctx.meta.inGlobalLabel = state.inGlobalLabel ? state.inGlobalLabel : ''
+        ctx.meta.inLabel = state.inLabel ? state.inLabel : ''
 
-        if (ctx.meta.inSection && ctx.state.sections) {
-            const section = ctx.state.sections[ctx.meta.inSection]
+        if (ctx.meta.inSection && state.sections) {
+            const section = state.sections[ctx.meta.inSection]
             section.endLine = ctx.line.lineNumber
 
-            if (ctx.meta.inGlobalLabel && ctx.state.labels) {
-                const label = ctx.state.labels[ctx.meta.inGlobalLabel]
+            if (ctx.meta.inGlobalLabel && state.labels) {
+                const label = state.labels[ctx.meta.inGlobalLabel]
                 label.endLine = ctx.line.lineNumber
                 label.byteSize = section.bytes.length - label.byteOffset
             }
-            if (ctx.meta.inLabel && ctx.state.labels) {
-                const label = ctx.state.labels[ctx.meta.inLabel]
+            if (ctx.meta.inLabel && state.labels) {
+                const label = state.labels[ctx.meta.inLabel]
                 label.endLine = ctx.line.lineNumber
                 label.byteSize = section.bytes.length - label.byteOffset
             }
@@ -120,21 +122,22 @@ export default class Evaluator {
     public calcConstExprOrPatch(type: PatchType, byteOffset: number, op: Node, expected: 'string', ctx: EvaluatorContext): string
     public calcConstExprOrPatch(type: PatchType, byteOffset: number, op: Node, expected: 'either', ctx: EvaluatorContext): number | string
     public calcConstExprOrPatch(type: PatchType, byteOffset: number, op: Node, expected: 'number' | 'string' | 'either', ctx: EvaluatorContext): number | string {
+        const state = ctx.context.state
         const defaultValue = (expected === 'string') ? '' : 0
         if (this.isConstExpr(op, ctx)) {
             return this.calcConstExpr(op, expected as any, ctx)
         } else if (this.getConstExprType(op) === 'string') {
             this.error('String expressions must be constant', op.token, ctx)
             return defaultValue
-        } else if (!ctx.state.inSections || !ctx.state.inSections.length) {
+        } else if (!state.inSections || !state.inSections.length) {
             this.error('Non-constant expressions must be placed within sections', op.token, ctx)
             return defaultValue
         } else {
             ctx.context.patches.push({
                 op,
-                file: ctx.state.file,
-                line: ctx.state.line,
-                section: ctx.state.inSections[0],
+                file: state.file,
+                line: state.line,
+                section: state.inSections[0],
                 type,
                 offset: byteOffset,
                 expr: this.buildLinkExpr(new BinarySerializer([]), op, ctx)
@@ -147,6 +150,7 @@ export default class Evaluator {
     public calcConstExpr(op: Node, expected: 'string', ctx: EvaluatorContext): string
     public calcConstExpr(op: Node, expected: 'either', ctx: EvaluatorContext): number | string
     public calcConstExpr(op: Node, expected: 'number' | 'string' | 'either', ctx: EvaluatorContext): number | string {
+        const state = ctx.context.state
         const defaultValue = (expected === 'string') ? '' : 0
         if (!this.isConstExpr(op, ctx)) {
             this.error('Expression must be constant', op.token, ctx)
@@ -159,8 +163,8 @@ export default class Evaluator {
         if (rule) {
             let val = rule(op, ctx, this)
             if (expected === 'number' && typeof val === 'string') {
-                if (ctx.state && ctx.state.charmaps && ctx.state.charmaps.hasOwnProperty(val)) {
-                    val = ctx.state.charmaps[val]
+                if (state && state.charmaps && state.charmaps.hasOwnProperty(val)) {
+                    val = state.charmaps[val]
                 } else if (val.length === 1) {
                     val = val.charCodeAt(0)
                 }
@@ -180,10 +184,11 @@ export default class Evaluator {
     }
 
     public isConstExpr(op: Node, ctx: EvaluatorContext): boolean {
+        const state = ctx.context.state
         if (op.type === NodeType.binary_operator && op.token.value === '-') {
-            if (ctx.state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
-                const left = ctx.state.labels[op.children[0].token.value]
-                const right = ctx.state.labels[op.children[1].token.value]
+            if (state.labels && op.children[0].type === NodeType.identifier && op.children[1].type === NodeType.identifier) {
+                const left = state.labels[op.children[0].token.value]
+                const right = state.labels[op.children[1].token.value]
                 if (left && right && left.section === right.section) {
                     return true
                 }
@@ -193,11 +198,11 @@ export default class Evaluator {
             if (PredefineRules[op.token.value]) {
                 return true
             }
-            if (ctx.state.numberEquates && ctx.state.numberEquates.hasOwnProperty(op.token.value)) {
+            if (state.numberEquates && state.numberEquates.hasOwnProperty(op.token.value)) {
                 return true
-            } else if (ctx.state.stringEquates && ctx.state.stringEquates.hasOwnProperty(op.token.value)) {
+            } else if (state.stringEquates && state.stringEquates.hasOwnProperty(op.token.value)) {
                 return true
-            } else if (ctx.state.sets && ctx.state.sets.hasOwnProperty(op.token.value)) {
+            } else if (state.sets && state.sets.hasOwnProperty(op.token.value)) {
                 return true
             }
             return false
@@ -242,6 +247,7 @@ export default class Evaluator {
     }
 
     public buildLinkExpr(bs: BinarySerializer, op: Node, ctx: EvaluatorContext): number[] {
+        const state = ctx.context.state
         switch (op.type) {
             case NodeType.binary_operator: {
                 const rule = LinkExprBinaryRules[op.token.value]
@@ -272,7 +278,7 @@ export default class Evaluator {
                     } else if (op.children[1].type === NodeType.identifier) {
                         let id = op.children[1].token.value
                         if (id.startsWith('.')) {
-                            id = ctx.state.inGlobalLabel + id
+                            id = state.inGlobalLabel + id
                         }
                         const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
                         if (symbol) {
@@ -320,7 +326,7 @@ export default class Evaluator {
                     } else if (op.children[1].type === NodeType.identifier) {
                         let id = op.children[1].token.value
                         if (id.startsWith('.')) {
-                            id = ctx.state.inGlobalLabel + id
+                            id = state.inGlobalLabel + id
                         }
                         const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
                         if (symbol) {
@@ -359,14 +365,14 @@ export default class Evaluator {
             case NodeType.identifier: {
                 let id = op.token.value
                 if (id.startsWith('.')) {
-                    id = ctx.state.inGlobalLabel + id
+                    id = state.inGlobalLabel + id
                 }
-                if (ctx.state.numberEquates && ctx.state.numberEquates[id]) {
+                if (state.numberEquates && state.numberEquates[id]) {
                     bs.writeByte(ExprType.immediate_int)
-                    bs.writeLong(ctx.state.numberEquates[id].value)
-                } else if (ctx.state.sets && ctx.state.sets[id]) {
+                    bs.writeLong(state.numberEquates[id].value)
+                } else if (state.sets && state.sets[id]) {
                     bs.writeByte(ExprType.immediate_int)
-                    bs.writeLong(ctx.state.sets[id].value)
+                    bs.writeLong(state.sets[id].value)
                 } else {
                     const symbol = ctx.context.objectFile.symbols.find((s) => s.name === id)
                     if (symbol) {
@@ -438,7 +444,7 @@ export default class Evaluator {
             id: labelId,
             startLine: state.line,
             endLine: state.line,
-            file: ctx.context.file.source.path,
+            file: ctx.context.rootFile.source.path,
             section: state.inSections[0],
             byteOffset: state.sections[state.inSections[0]].bytes.length,
             byteSize: 0,
@@ -474,10 +480,10 @@ export default class Evaluator {
     }
 
     public error(msg: string, token: Token | undefined, ctx: EvaluatorContext): void {
-        ctx.diagnostics.push(new Diagnostic('Evaluator', msg, 'error', token, ctx.line))
+        ctx.context.diagnostics.push(new Diagnostic('Evaluator', msg, 'error', token, ctx.line))
     }
 
     public warn(msg: string, token: Token | undefined, ctx: EvaluatorContext): void {
-        ctx.diagnostics.push(new Diagnostic('Evaluator', msg, 'warn', token, ctx.line))
+        ctx.context.diagnostics.push(new Diagnostic('Evaluator', msg, 'warn', token, ctx.line))
     }
 }
