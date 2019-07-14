@@ -53,13 +53,7 @@ const FormatRules: { [key: number]: FormatRule } = {
     [NodeType.region]: (n, ctx, f) => `${f.capitalize(n.token.value, ctx.options.regionCase)}${n.children.length ? f.formatNode(n.children[0], ctx) : ''}`,
     [NodeType.register]: (n, ctx, f) => f.capitalize(n.token.value, ctx.options.registerCase),
     [NodeType.string]: (n) => n.token.value,
-    [NodeType.unary_operator]: (n, ctx, f) => {
-        if (n.token.value === '=') {
-            return `${n.token.value} ${f.formatNode(n.children[0], ctx)}`
-        } else {
-            return `${n.token.value}${f.formatNode(n.children[0], ctx)}`
-        }
-    }
+    [NodeType.unary_operator]: (n, ctx, f) => `${n.token.value}${f.formatNode(n.children[0], ctx)}`
 }
 
 export default FormatRules

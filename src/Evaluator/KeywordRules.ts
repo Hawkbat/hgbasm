@@ -66,6 +66,7 @@ const KeywordRules: { [key: string]: KeywordRule } = {
         ctx.meta.set = labelId
         e.logger.logLine('defineSymbol', 'Define set', labelId, 'as', state.sets[labelId].value.toString())
     },
+    ['=']: (state, op, label, ctx, e) => KeywordRules.set(state, op, label, ctx, e),
     charmap: (state, op, _, ctx, e) => {
         if (op.children.length !== 2) {
             e.error('Keyword needs exactly two arguments', op.token, ctx)

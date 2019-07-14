@@ -132,7 +132,11 @@ const TokenRules: ITokenRule[] = [
     },
     {
         type: TokenType.operator,
-        rules: [[MatchType.one, ['!=', '==', '<=', '>=', '&&', '||', '<<', '>>', '<', '>', '~', '+', '-', '*', '/', '%', '&', '|', '^', '=', '!']]]
+        rules: [[MatchType.one, ['!=', '==', '<=', '>=', '&&', '||', '<<', '>>', '<', '>', '~', '+', '-', '*', '/', '%', '&', '|', '^', '!']]]
+    },
+    {
+        type: TokenType.keyword,
+        rules: [[MatchType.one, ['=']]]
     },
     {
         type: TokenType.comma,

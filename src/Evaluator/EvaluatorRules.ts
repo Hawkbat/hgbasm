@@ -21,21 +21,6 @@ const EvaluatorRules: { [key: number]: EvaluatorRule } = {
         }
         rule(ctx, args, e)
     },
-    [NodeType.unary_operator]: (state, op, label, ctx, e) => {
-        if (op.token.value === '=') {
-            const labelId = label ? label.token.value.replace(/:/g, '') : ''
-            state.sets = state.sets ? state.sets : {}
-            state.sets[labelId] = {
-                id: labelId,
-                startLine: state.line,
-                endLine: state.line,
-                file: state.file,
-                value: e.calcConstExpr(op.children[0], 'number', ctx)
-            }
-        } else {
-            e.error('No unary operator evaluation rule matches', op.token, ctx)
-        }
-    },
     [NodeType.keyword]: (state, op, label, ctx, e) => {
         const rule = KeywordRules[op.token.value.toLowerCase()]
         if (!rule) {
