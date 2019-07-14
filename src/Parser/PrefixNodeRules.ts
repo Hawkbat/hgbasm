@@ -10,25 +10,34 @@ const PrefixNodeRules: { [key: number]: PrefixNodeRule } = {
             return new Node(NodeType.line, token, [])
         } else {
             const children: Node[] = []
-            if (p.peekToken(TokenType.identifier, ctx)) {
-                const right = p.parseNode(99, ctx)
-                right.type = NodeType.label
-                children.push(right)
-            }
-            const opToken = p.peekToken(TokenType.operator, ctx)
-            if (opToken && children.length && opToken.value === '=') {
+            if (p.peekToken(TokenType.directive, ctx)) {
                 const right = p.parseNode(99, ctx)
                 children.push(right)
-            }
-            const kwToken = p.peekToken(TokenType.keyword, ctx)
-            if (kwToken && (!children.length || children[0].token.value.endsWith(':'))) {
-                const opcode = kwToken.value.toLowerCase()
-                if (opcode === 'set' || opcode === 'rl') {
-                    kwToken.type = TokenType.opcode
+            } else {
+                if (p.peekToken(TokenType.identifier, ctx)) {
+                    const right = p.parseNode(99, ctx)
+                    right.type = NodeType.label
+                    children.push(right)
                 }
+                if (p.peekToken(TokenType.keyword, ctx) || p.peekToken(TokenType.opcode, ctx) || p.peekToken(TokenType.macro_call, ctx)) {
+                    const kwToken = p.peekToken(TokenType.keyword, ctx)
+                    if (kwToken && kwToken.col > 0 && (!children.length || children[0].token.value.endsWith(':'))) {
+                        const opcode = kwToken.value.toLowerCase()
+                        if (opcode === 'set' || opcode === 'rl') {
+                            kwToken.type = TokenType.opcode
+                        }
+                    }
+                    const right = p.parseNode(99, ctx)
+                    children.push(right)
+                }
+            }
+            if (p.peekToken(TokenType.semicolon_comment, ctx)) {
+                const right = p.parseNode(99, ctx)
+                children.push(right)
             }
             while (p.peekToken(null, ctx) && !p.peekToken(TokenType.end_of_line, ctx)) {
                 const right = p.parseNode(99, ctx)
+                p.error(`Unexpected ${NodeType[right.type]}`, right.token, ctx)
                 children.push(right)
             }
             p.consumeToken(TokenType.end_of_line, ctx)
