@@ -83,7 +83,11 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             return
         }
         state.inConditionals = state.inConditionals ? state.inConditionals : []
-        state.inConditionals.unshift({ condition: e.calcConstExpr(op.children[0], 'number', ctx) !== 0 })
+        if (state.inConditionals.length && !state.inConditionals[0].condition) {
+            state.inConditionals.unshift({ condition: false })
+        } else {
+            state.inConditionals.unshift({ condition: e.calcConstExpr(op.children[0], 'number', ctx) !== 0 })
+        }
     },
     elif: (state, op, _, ctx, e) => {
         if (op.children.length !== 1) {
@@ -94,11 +98,17 @@ const KeywordRules: { [key: string]: KeywordRule } = {
             e.error('No matching if or elif to continue', op.token, ctx)
             return
         }
+        if (state.inConditionals.length > 1 && !state.inConditionals[1].condition) {
+            return
+        }
         state.inConditionals[0].condition = e.calcConstExpr(op.children[0], 'number', ctx) !== 0
     },
     else: (state, op, _, ctx, e) => {
         if (!state.inConditionals || !state.inConditionals.length) {
             e.error('No matching if or elif to continue', op.token, ctx)
+            return
+        }
+        if (state.inConditionals.length > 1 && !state.inConditionals[1].condition) {
             return
         }
         state.inConditionals[0].condition = !state.inConditionals[0].condition
