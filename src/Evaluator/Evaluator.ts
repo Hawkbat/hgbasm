@@ -444,7 +444,7 @@ export default class Evaluator {
             id: labelId,
             startLine: state.line,
             endLine: state.line,
-            file: ctx.context.rootFile.source.path,
+            file: state.file,
             section: state.inSections[0],
             byteOffset: state.sections[state.inSections[0]].bytes.length,
             byteSize: 0,
